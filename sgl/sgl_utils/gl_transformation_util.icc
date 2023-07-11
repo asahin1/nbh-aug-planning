@@ -1,0 +1,74 @@
+/**************************************************************************
+ *                                                                        *
+ *  Simple OpenGL (SGL)                                                   *
+ *  A simplified, threaded C++ wrapper for OpenGL and GLUT                *
+ *  Version 1.x                                                           *
+ *  ----------------------------------------------------------            *
+ *  Copyright (C) 2018  Subhrajit Bhattacharya                            *
+ *                                                                        *
+ *  This program is free software: you can redistribute it and/or modify  *
+ *  it under the terms of the GNU General Public License as published by  *
+ *  the Free Software Foundation, either version 3 of the License, or     *
+ *  (at your option) any later version.                                   *
+ *                                                                        *
+ *  This program is distributed in the hope that it will be useful,       *
+ *  but WITHOUT ANY WARRANTY; without even the implied warranty of        *
+ *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the         *
+ *  GNU General Public License for more details                           *
+ *  <http://www.gnu.org/licenses/>                                        *
+ *                                                                        *
+ *                                                                        *
+ *  Contact: subhrajit@gmail.com, http://subhrajit.net/                   *
+ *                                                                        *
+ *                                                                        *
+ **************************************************************************/
+
+#ifndef _SGL_GL_TRANSFORMATION_UTIL_ICC
+#define _SGL_GL_TRANSFORMATION_UTIL_ICC
+
+#include <GL/freeglut.h>
+
+class sglTransformation {
+public:
+    GLenum matrix_mode;
+    
+    void _push (void) { glMatrixMode(matrix_mode); glPushMatrix(); } // will be incorporated in push(). Not to be called by object classes.
+    virtual void apply (void) { _push(); }
+    void remove (void) { glMatrixMode(matrix_mode); glPopMatrix(); }
+    
+    // virtual destructor
+    virtual ~sglTransformation() { }
+};
+
+// ================================
+
+class sglRotate : public sglTransformation {
+public:
+    double angle, x, y, z;
+    sglRotate (double ang, double xx, double yy, double zz, GLenum mode=GL_MODELVIEW) :
+        angle(ang), x(xx), y(yy), z(zz) { matrix_mode = mode;}
+    
+    virtual void apply (void) { _push(); glRotated (angle, x, y, z); }
+};
+
+
+class sglTranslate : public sglTransformation {
+public:
+    double x, y, z;
+    sglTranslate (double xx, double yy, double zz, GLenum mode=GL_MODELVIEW) :
+        x(xx), y(yy), z(zz) { matrix_mode = mode;}
+    
+    virtual void apply (void) { _push(); glTranslated (x, y, z); }
+};
+
+
+class sglScale : public sglTransformation {
+public:
+    double x, y, z;
+    sglScale (double xx, double yy, double zz, GLenum mode=GL_MODELVIEW) :
+        x(xx), y(yy), z(zz) { matrix_mode = mode;}
+    
+    virtual void apply (void) { _push(); glScaled (x, y, z); }
+};
+
+#endif

@@ -1,0 +1,72 @@
+{
+    'map_indoor':
+    {  environment: { pixmap: "map_indoor.png"},
+        start:     [50, 30],
+        goal:      [80, 120],
+        plot_options: { plot_scale: 7.0,
+                        line_thickness: 3.0},
+        n_paths: 3                              
+    },
+
+    'map_nonuniform':                                        
+    {  environment: { pixmap: "map_nonuniform_obstacles.png",
+                      cost_type: "nonuniform",
+                      cost_multiplier: 4.0},    
+        start:     [20 , 20],                       
+        goal:      [140, 180],   
+        plot_options: { plot_scale: 5.0,
+                        line_thickness: 3.0,
+                        plot_map: "map_nonuniform_costs.png"},
+        n_paths: 3                             
+    },
+
+    'map_nonuniform_with_obstacles':                                        
+    {  environment: { pixmap: "map_nu_obst_obstacles.png",
+                      cost_type: "nonuniform",
+                      cost_multiplier: 4.0},      
+        gene_threshold: 50,                         
+        start:     [35 , 75],                       
+        goal:      [170, 75],   
+        plot_options: { plot_scale: 5.0,
+                        line_thickness: 3.0,
+                        plot_map: "map_nu_obst_costs.png"},
+        n_paths: 3                             
+    },
+    
+    'map_single_high_cost':
+    {  environment: { pixmap: "map_single_high_cost_obstacles.png",
+                      cost_type: "nonuniform",
+                      cost_multiplier: 4.0 },
+        start:     [15, 50],
+        // goal:      [90, 10],
+        goal:      [90, 50],
+        plot_options: { plot_scale: 10.0,
+                        line_thickness: 2.0,
+                        plot_map: "map_single_high_cost_costs.png"},
+        n_paths: 2                              
+    },
+    
+    'map_cm_analysis':
+    {  environment: { pixmap: "map_single_high_cost_obstacles.png",
+                      cost_type: "nonuniform",
+                      cost_multiplier: 4.0 },
+        start:     [15, 50],
+        goal:      [90, 50],
+        plot_options: { plot_scale: 8.0,
+                        line_thickness: 1.0,
+                        plot_map: "map_cm_analysis_costs.png"},
+        n_paths: 2                              
+    },
+    
+    'map_tangent_test':
+    {  environment: { pixmap: "map_tangent_test_obstacles.png",
+                      cost_type: "nonuniform",
+                      cost_multiplier: 4.0 },
+        start:     [180, 40],
+        goal:      [25, 75],
+        plot_options: { plot_scale: 8.0,
+                        line_thickness: 1.0,
+                        plot_map: "map_tangent_test_costs.png"},
+        n_paths: 2                              
+    }
+}

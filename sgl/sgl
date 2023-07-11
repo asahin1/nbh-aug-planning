@@ -1,0 +1,67 @@
+/**************************************************************************
+ *                                                                        *
+ *  Simple OpenGL (SGL)                                                   *
+ *  A simplified, threaded C++ wrapper for OpenGL and GLUT                *
+ *  Version 1.x                                                           *
+ *  ----------------------------------------------------------            *
+ *  Copyright (C) 2018  Subhrajit Bhattacharya                            *
+ *                                                                        *
+ *  This program is free software: you can redistribute it and/or modify  *
+ *  it under the terms of the GNU General Public License as published by  *
+ *  the Free Software Foundation, either version 3 of the License, or     *
+ *  (at your option) any later version.                                   *
+ *                                                                        *
+ *  This program is distributed in the hope that it will be useful,       *
+ *  but WITHOUT ANY WARRANTY; without even the implied warranty of        *
+ *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the         *
+ *  GNU General Public License for more details                           *
+ *  <http://www.gnu.org/licenses/>                                        *
+ *                                                                        *
+ *                                                                        *
+ *  Contact: subhrajit@gmail.com, http://subhrajit.net/                   *
+ *                                                                        *
+ *                                                                        *
+ **************************************************************************/
+
+#ifndef _SGL_y7483fhcbcyg88c_
+#define _SGL_y7483fhcbcyg88c_
+namespace sgl {
+}
+
+// Macros
+#define SINGLE_ARG(...) __VA_ARGS__
+
+// Any type
+#ifndef sgl_any
+    // boost::any
+    #include <boost/any.hpp>
+    #define sgl_any                     boost::any
+    #define sgl_any_cast(type,anyvar)   boost::any_cast< type >(anyvar)
+#endif
+
+// ===============================
+// utils
+
+#include "sgl_utils/simple_lock.icc"
+
+typedef enum {SGL_DRAW_LOCK, SGL_MEM_LOCK} sglLockStates;
+SimpleLock<sglLockStates,LOCK_RECURSIVE> sglDrawLock;
+
+#include "sgl_utils/stl_utils.icc"
+#include "sgl_utils/gl_utils.icc"
+#include "sgl_utils/gl_transformation_util.icc"
+#include "sgl_utils/gl_properties.icc"
+
+// ===============================
+// objects
+#include "sgl_objects/object_base.icc"
+#include "sgl_objects/template_.icc"
+// --
+#include "sgl_objects/figure.icc"
+#include "sgl_objects/point.icc"
+#include "sgl_objects/line.icc"
+#include "sgl_objects/box.icc"
+#include "sgl_objects/sphere.icc"
+
+// }
+#endif

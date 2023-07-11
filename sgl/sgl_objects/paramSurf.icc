@@ -1,0 +1,196 @@
+/**************************************************************************
+ *                                                                        *
+ *  Simple OpenGL (SGL)                                                   *
+ *  A simplified, threaded C++ wrapper for OpenGL and GLUT                *
+ *  Version 1.x                                                           *
+ *  ----------------------------------------------------------            *
+ *  Copyright (C) 2018  Subhrajit Bhattacharya                            *
+ *                                                                        *
+ *  This program is free software: you can redistribute it and/or modify  *
+ *  it under the terms of the GNU General Public License as published by  *
+ *  the Free Software Foundation, either version 3 of the License, or     *
+ *  (at your option) any later version.                                   *
+ *                                                                        *
+ *  This program is distributed in the hope that it will be useful,       *
+ *  but WITHOUT ANY WARRANTY; without even the implied warranty of        *
+ *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the         *
+ *  GNU General Public License for more details                           *
+ *  <http://www.gnu.org/licenses/>                                        *
+ *                                                                        *
+ *                                                                        *
+ *  Contact: subhrajit@gmail.com, http://subhrajit.net/                   *
+ *                                                                        *
+ *                                                                        *
+ **************************************************************************/
+
+#ifndef _SGL_PARAM_SURF_ICC
+#define _SGL_PARAM_SURF_ICC
+
+#include <GL/freeglut.h>
+#include <vector>
+
+#include "../sgl_utils/stl_utils.icc"
+#include "../sgl_utils/gl_utils.icc"
+#include "../sgl_utils/gl_transformation_util.icc"
+
+#include "object_base.icc" // Necessary
+
+template <class evaluatorFunType>
+class sglParamSurf : public sglObject // TODO: Change class name
+{
+public:
+    // +++++++++++++++++++++++++
+    // Properties:
+    //     Members derived from 'sglObject':
+    //       - OPropertiesMap    this_OP;    // will contain all native object properties (OP)
+    //       - CPropertiesMap    this_CP;    // temporary variable (can be private)
+    //    sglObject already declares following object properties (OP):
+    //       - visible, color, alpha, translation, scale
+    //    sglObject already declares following link properties (LP):
+    //       - visible
+    
+    // object (self) properties
+    // TODO: Add.
+    //       Syntax:  declare_OP (type_name, variable_name, default_value);
+    //       Example: declare_OP (double, linewidth, 1.0);
+    
+    // link (to children) properties
+    // TODO: Add.
+    //       Syntax: declare_LP (type_name, variable_name, default_value);
+    //       Example: declare_LP (bool, use_vertex_color, false); // Don't use vertex color by default
+    declare_LP (bool, use_vertex_color, false); // Don't use vertex color by default
+    declare_LP (double, vertex_color_weight, -1.0); // use alpha as weight if negative
+    
+    // non-heritable object properties
+    // TODO: Add.
+    //       Example: std::string name;
+    
+    // ------------------------------------------
+    
+    // Child pointers for convenience
+    // TODO: Add.
+    //       Example: std::vector <sglPoint*>  points;
+    std::vector< std::vector <sglPoint*> >  points; // surface between points[i][j], points[i+1][j], points[i+1][j+1], points[i][j+1], 
+    
+    // Local storage variables
+    std::vector<double> 
+    
+    // ------------------------------------------
+    
+    // Constructors for setting default properties
+    // TODO: Add.
+    
+    sglParamSurf (std::vector< std::vector <double> > XX, std::vector< std::vector <double> > YY, std::vector< std::vector <double> > ZZ,
+                    double r=1.0, double g=0.0, double b=0.0, double a=1.0) 
+        : sglObject (sglMake3vec(r,g,b), a) 
+    {
+        for (int i=0; i<XX.size(); ++i)
+            for (int j=0; j<XX[i].size(); ++j)
+                
+        // 
+        sglPoint* pp0 = addPoint ( sglPoint (sglMake3vec (xx0,yy0,zz0)) );
+        sglPoint* pp1 = addPoint ( sglPoint (sglMake3vec (xx1,yy0,zz0)) );
+        sglPoint* pp2 = addPoint ( sglPoint (sglMake3vec (xx1,yy1,zz0)) );
+        sglPoint* pp3 = addPoint ( sglPoint (sglMake3vec (xx0,yy1,zz0)) );
+        //
+        sglPoint* pp4 = addPoint ( sglPoint (sglMake3vec (xx0,yy0,zz1)) );
+        sglPoint* pp5 = addPoint ( sglPoint (sglMake3vec (xx1,yy0,zz1)) );
+        sglPoint* pp6 = addPoint ( sglPoint (sglMake3vec (xx1,yy1,zz1)) );
+        sglPoint* pp7 = addPoint ( sglPoint (sglMake3vec (xx0,yy1,zz1)) );
+    }
+    
+    sglBox (const std::vector<double>& p1, const std::vector<double>& p2,
+                const std::vector<double>& c=sglMake3vec (1.0, 0.0, 0.0), double a=1.0) 
+            : sglBox (p1[0],p1[1],p1[2], p2[0],p2[1],p2[2], c[0],c[1],c[2], a) 
+    { }
+    
+    sglBox (double r=1.0, double g=0.0, double b=0.0, double a=1.0) 
+            : sglBox (sglMake3vec(0.0,0.0,0.0), sglMake3vec(1.0,1.0,1.0), sglMake3vec(r,g,b), a)
+    {  }
+    
+    // -------------------------
+    // Mix parents' and self properties
+    void computeProperties (CPropertiesMap&  parent_CP,  LPropertiesMap&  parent_child_LP) {
+        // Use base class function to compute visible, color, alpha
+        sglObject::computeProperties (parent_CP, parent_child_LP);
+        // --
+        // Other object properties computation
+        // TODO: Add.
+        //      Example: linewidth(this_CP) = linewidth();
+    }
+    
+    // +++++++++++++++++++++++++
+    // -------------------------
+    // functions for adding/removing/showing child objects
+    // Convention: Each add function has two versions:
+    //                      i. One that accepts reference -- will create a distinct copy of the child object
+    //                     ii. One that accepts pointer -- will link to a previously-created child object
+    
+    // TODO: Add.
+    
+    sglPoint* addPoint (const sglPoint& p) {
+        // Add as child first
+        sglPoint* pp = addChild (p);
+        // insert in local refernce variables
+        points.push_back (pp);
+        // set some child properties
+        pp->visible() = false;
+        pp->color() = color();
+        // set some link properties if required
+        // ...
+        // return
+        return (pp);
+    }
+    
+    // -------------------------
+    // Functions to change link-to-child properties en-masse
+    
+    // TODO: Add.
+    void use_vertex_color_all (bool use=true) {
+        for (auto it=points.begin(); it!=points.end(); ++it) // iterate through the local vector storing the points
+            use_vertex_color(*it) = use;
+    }
+    
+    // +++++++++++++++++++++++++
+    // -------------------------
+    // Drawing function
+    
+    virtual void draw (CPropertiesMap&  parent_CP,  LPropertiesMap&  parent_child_LP) {
+        sgl_draw_function_head; // computes 'this_CP'
+        // --
+        if ( visible(this_CP) ) {
+        
+            // --
+            // Apply transformations
+            for (int a=transformations_p.size()-1; a>=0; --a)
+                transformations_p[a]->apply();
+            
+            // --
+            // TODO: Execute OpenGL core functions to draw self
+            glMatrixMode(GL_MODELVIEW);
+            glColor (color(this_CP), alpha(this_CP)); // set color from 'this_CP'
+            glBegin (GL_TRIANGLES);
+                // Draw all 12 triangles
+                for (int a=0; a<12; ++a) {
+                    glNormal3f (sglBox_TriangleNormals[a/2][0], sglBox_TriangleNormals[a/2][1], 
+                                                                            sglBox_TriangleNormals[a/2][2]);
+                    for (int b=0; b<3; ++b)
+                        glVertex3f (points[ sglBox_TriangleIndices[a][b] ]->coords()[0], 
+                                        points[ sglBox_TriangleIndices[a][b] ]->coords()[1], 
+                                            points[ sglBox_TriangleIndices[a][b] ]->coords()[2]);
+                }
+            glEnd();
+            
+            // TODO: Draw children if required
+            for (auto it=childObjects_p.begin(); it!=childObjects_p.end(); ++it)
+                it->first->draw (this_CP, it->second);
+            
+            // --
+            // Remove transformations
+            for (int a=0; a<transformations_p.size(); ++a)
+                transformations_p[a]->remove();
+        }
+    }
+};
+
+#endif

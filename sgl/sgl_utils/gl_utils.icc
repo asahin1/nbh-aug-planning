@@ -1,0 +1,39 @@
+/**************************************************************************
+ *                                                                        *
+ *  Simple OpenGL (SGL)                                                   *
+ *  A simplified, threaded C++ wrapper for OpenGL and GLUT                *
+ *  Version 1.x                                                           *
+ *  ----------------------------------------------------------            *
+ *  Copyright (C) 2018  Subhrajit Bhattacharya                            *
+ *                                                                        *
+ *  This program is free software: you can redistribute it and/or modify  *
+ *  it under the terms of the GNU General Public License as published by  *
+ *  the Free Software Foundation, either version 3 of the License, or     *
+ *  (at your option) any later version.                                   *
+ *                                                                        *
+ *  This program is distributed in the hope that it will be useful,       *
+ *  but WITHOUT ANY WARRANTY; without even the implied warranty of        *
+ *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the         *
+ *  GNU General Public License for more details                           *
+ *  <http://www.gnu.org/licenses/>                                        *
+ *                                                                        *
+ *                                                                        *
+ *  Contact: subhrajit@gmail.com, http://subhrajit.net/                   *
+ *                                                                        *
+ *                                                                        *
+ **************************************************************************/
+
+#ifndef _SGL_GL_UTILS_ICC
+#define _SGL_GL_UTILS_ICC
+
+#include <vector>
+#include <GL/freeglut.h>
+
+inline void glColor (std::vector<double> color, double alpha) {
+    if (alpha >= 0.0) 
+        glColor4f (color[0], color[1], color[2], alpha);
+    else 
+        glColor3f (color[0], color[1], color[2]);
+}
+
+#endif

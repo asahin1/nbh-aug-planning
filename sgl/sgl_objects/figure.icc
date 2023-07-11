@@ -1,0 +1,582 @@
+/**************************************************************************
+ *                                                                        *
+ *  Simple OpenGL (SGL)                                                   *
+ *  A simplified, threaded C++ wrapper for OpenGL and GLUT                *
+ *  Version 1.x                                                           *
+ *  ----------------------------------------------------------            *
+ *  Copyright (C) 2018  Subhrajit Bhattacharya                            *
+ *                                                                        *
+ *  This program is free software: you can redistribute it and/or modify  *
+ *  it under the terms of the GNU General Public License as published by  *
+ *  the Free Software Foundation, either version 3 of the License, or     *
+ *  (at your option) any later version.                                   *
+ *                                                                        *
+ *  This program is distributed in the hope that it will be useful,       *
+ *  but WITHOUT ANY WARRANTY; without even the implied warranty of        *
+ *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the         *
+ *  GNU General Public License for more details                           *
+ *  <http://www.gnu.org/licenses/>                                        *
+ *                                                                        *
+ *                                                                        *
+ *  Contact: subhrajit@gmail.com, http://subhrajit.net/                   *
+ *                                                                        *
+ *                                                                        *
+ **************************************************************************/
+
+#ifndef _SGL_FIGURE_ICC
+#define _SGL_FIGURE_ICC
+
+// OpenCV for writing image file
+#if __opencv
+#include <opencv2/opencv.hpp>
+#include <opencv2/highgui.hpp>
+#include <opencv2/imgproc.hpp>
+#endif
+
+#include <vector>
+#include <unordered_map>
+#include <string>
+#include <X11/Xlib.h>
+#include <GL/freeglut.h>
+#include <thread>
+#include <chrono>
+
+// GLT-ZPR
+#include "../glt_zpr/zpr.icc"
+
+#include "../sgl_utils/stl_utils.icc"
+#include "../sgl_utils/gl_properties.icc"
+
+#include "object_base.icc"
+
+#include "box.icc"
+#include "line.icc"
+
+// --------------------------------------------
+
+class sglFigure : public sglObject
+{
+public:
+    // +++++++++++++++++++++++++
+    // Properties:
+    //     Members derived from 'sglObject':
+    //       - OPropertiesMap    this_OP;    // will contain all native object properties (OP)
+    //       - CPropertiesMap    this_CP;  // temporary variable (can be private)
+    //    sglObject already declares following object properties (OP):
+    //       - visible, color, alpha
+    //    sglObject already declares following link properties (LP):
+    //       - visible
+
+    // non-heritable object properties
+    std::string name;
+    double width, height;
+    std::vector<sglLight> lights;
+    std::vector<sglBox *> in_figure_boxes;
+    std::vector<sglLine *> in_figure_lines;
+    float view_angle = 0.0f;
+    bool moving_cam = false;
+
+    // Status defining variables
+    bool waiting_for_keypress;
+    unsigned char pressed_key;
+
+    // Static variables specific to figure
+    static bool glutInitiated;
+    static bool glutMainLoopCalled;
+    static std::thread glutMainLoopThread;
+
+    // Camera pose
+    std::vector<double> init_cam_config;
+    cv::Point3d cam_pose;
+    float cam_scale{0.05};
+
+    // Constructors for setting default properties
+    sglFigure(std::string nm = "<untitled>") : sglObject(sglMake3vec(1.0, 1.0, 1.0), 1.0)
+    {
+        name = nm;
+        width = 600;
+        height = 600;
+        lights.resize(1);
+        initiated = false;
+        winID = -1;
+        // --
+        waiting_for_keypress = false;
+        cam_pose_ptr = &cam_pose;
+    }
+
+    // -------------------------
+    // Mix parents' and self properties
+    void computeProperties(CPropertiesMap &parent_CP, LPropertiesMap &parent_child_LP)
+    {
+        sglObject::computeProperties(parent_CP, parent_child_LP);
+    }
+
+    // +++++++++++++++++++++++++
+    // -------------------------
+    // Drawing function
+
+    virtual void draw(CPropertiesMap &parent_CP, LPropertiesMap &parent_child_LP);
+
+    // +++++++++++++++++++++++++
+    // ---------------------
+    // Destructor
+    ~sglFigure();
+
+    // ---------------------
+    // Functions specific to figure
+    void init(int argc = 0, char *argv[] = NULL);
+    void flush(void);
+    void close(void);
+    // --
+    unsigned char get_key(std::string msg = "");
+    bool save_as_image(const char *fname = "image.png");
+
+private:
+    // Properties specific to figure (non-object)
+    bool initiated;
+    int winID;
+};
+
+// ===========================================
+// Variables and functions specefic to figure
+
+bool sglFigure::glutInitiated = false;
+bool sglFigure::glutMainLoopCalled = false;
+std::thread sglFigure::glutMainLoopThread;
+
+// ------------------------------------------
+
+static std::unordered_map<int, sglFigure *> allGlFigures;
+
+// ===========================================
+// Global gl unctions
+
+inline void _globalDisplayFunction(void)
+{
+    // kill thread if no figures to draw
+    if (allGlFigures.size() == 0)
+        std::terminate();
+
+    int winID = glutGetWindow();
+
+    if (allGlFigures.find(winID) != allGlFigures.end())
+    {
+        allGlFigures[winID]->draw(sglFigure::empty_CP, sglFigure::empty_LP);
+        // printf ("Drawn %d objects in window %d.\n", allGlFigures[winID]->childObjects_p.size(), winID);
+    }
+}
+
+// --------------------------
+
+inline void _globalKeyFunction(unsigned char key, int x, int y)
+{
+    // kill thread if no figures to draw
+    if (allGlFigures.size() == 0)
+        std::terminate();
+
+    int winID = glutGetWindow();
+
+    if (allGlFigures.find(winID) != allGlFigures.end())
+    {
+        if (allGlFigures[winID]->waiting_for_keypress)
+        {
+            allGlFigures[winID]->waiting_for_keypress = false;
+            allGlFigures[winID]->pressed_key = key;
+        }
+    }
+}
+
+// ===========================================
+// definitions of members
+
+void sglFigure::draw(CPropertiesMap &parent_CP, LPropertiesMap &parent_child_LP)
+{
+    computeProperties(parent_CP, parent_child_LP); // computes 'this_CP'
+    // --
+    if (visible(this_CP))
+    {
+        // Clear figure.
+        std::vector<double> &c = color();
+        glClearColor(c[0], c[1], c[2], 0.0f);
+        glClearDepth(1.0f);
+        if (alpha() >= 0.0)
+        {
+            glEnable(GL_BLEND); // Add alpha blending
+            glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+            // Method 1:
+            // glDisable(GL_CULL_FACE);
+            // glDepthFunc(GL_LEQUAL);
+
+            // Method 2:
+            // double f = 0.75;
+            // glDisable(GL_CULL_FACE);
+            // glDepthFunc(GL_LEQUAL);
+
+            // glDisable(GL_CULL_FACE);
+            // glDepthFunc(GL_GREATER);
+
+            // glDisable(GL_CULL_FACE);
+            // glDepthFunc(GL_LEQUAL);
+
+            // Method 3:
+            // double f = 0.75;
+            // glDisable(GL_CULL_FACE);
+            // glDepthFunc(GL_ALWAYS);
+
+            // glDisable(GL_CULL_FACE);
+            // glDepthFunc(GL_LEQUAL);
+
+            // Method 4:
+            // glDisable(GL_CULL_FACE);
+            // glDepthFunc(GL_LESS);
+
+            // for (auto it = childObjects_p.begin(); it != childObjects_p.end(); ++it)
+            // {
+            //     it->first->draw(this_CP, it->second);
+            // }
+
+            // glEnable(GL_CULL_FACE);
+            // glCullFace(GL_FRONT);
+            // glDepthFunc(GL_ALWAYS);
+
+            // for (auto it = childObjects_p.begin(); it != childObjects_p.end(); ++it)
+            // {
+            //     it->first->draw(this_CP, it->second);
+            // }
+
+            // glEnable(GL_CULL_FACE);
+            // glCullFace(GL_FRONT);
+            // glDepthFunc(GL_LEQUAL);
+
+            // for (auto it = childObjects_p.begin(); it != childObjects_p.end(); ++it)
+            // {
+            //     it->first->draw(this_CP, it->second);
+            // }
+
+            // glEnable(GL_CULL_FACE);
+            // glCullFace(GL_BACK);
+            // glDepthFunc(GL_ALWAYS);
+
+            // for (auto it = childObjects_p.begin(); it != childObjects_p.end(); ++it)
+            // {
+            //     it->first->draw(this_CP, it->second);
+            // }
+
+            // glEnable(GL_CULL_FACE);
+            // glCullFace(GL_BACK);
+            // glDepthFunc(GL_LEQUAL);
+
+            // for (auto it = childObjects_p.begin(); it != childObjects_p.end(); ++it)
+            // {
+            //     it->first->draw(this_CP, it->second);
+            // }
+
+            // glDisable(GL_CULL_FACE);
+            // glDepthFunc(GL_LEQUAL);
+        }
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        if (moving_cam)
+        {
+            glLoadIdentity();
+            // glScalef(0.04f, 0.04f, 0.04f);
+            glScalef(cam_scale, cam_scale, cam_scale);
+            if (!init_cam_config.empty())
+                gluLookAt(init_cam_config[0], init_cam_config[1], init_cam_config[2],
+                          init_cam_config[3], init_cam_config[4], init_cam_config[5],
+                          init_cam_config[6], init_cam_config[7], init_cam_config[8]);
+            else
+                gluLookAt(5.0f, 5.0f, 50.0f,
+                          0.0f, 0.0f, 0.0f,
+                          0.0f, 1.0f, 0.0f);
+            glRotatef(view_angle, 0.0f, 0.0f, 1.0f);
+            view_angle += 0.20f;
+        }
+        // Draw the children
+        GLdouble gl_matrix[16];
+        glGetDoublev(GL_MODELVIEW_MATRIX, gl_matrix);
+        cv::Mat cv_matrix = cv::Mat::zeros(cv::Size(4, 4), CV_64F);
+        for (int i{0}; i < 4; i++)
+        {
+            for (int j{0}; j < 4; j++)
+            {
+                cv_matrix.at<double>(j, i) = gl_matrix[4 * i + j];
+            }
+        }
+        cv::Vec4d curr(0, 0, 0, 1);
+        cv::Mat cam_p = cv_matrix.inv() * cv::Mat(curr);
+        cam_pose = cv::Point3d(cam_p.at<double>(0), cam_p.at<double>(1), cam_p.at<double>(2));
+
+        for (auto it = childObjects_p.begin(); it != childObjects_p.end(); ++it)
+        {
+            it->first->draw(this_CP, it->second);
+        }
+        std::priority_queue<std::pair<double, sglLine *>, std::vector<std::pair<double, sglLine *>>, std::greater<std::pair<double, sglLine *>>> depth_queue_line;
+        for (auto l : in_figure_lines)
+        {
+            double avg_x, avg_y, avg_z;
+            for (auto p : l->points)
+            {
+                avg_x += p->x();
+                avg_y += p->y();
+                avg_z += p->z();
+            }
+            avg_x = avg_x / l->points.size();
+            avg_y = avg_y / l->points.size();
+            avg_z = avg_z / l->points.size();
+            cv::Point3d avg_pos(avg_x, avg_y, avg_z);
+            double dist_from_cam = cv::norm(avg_pos - cam_pose);
+            depth_queue_line.push(std::make_pair(dist_from_cam, l));
+        }
+        // glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+        while (!depth_queue_line.empty())
+        {
+            auto child_line = depth_queue_line.top();
+            // std::cout << "Dist from cam: " << child_line.first << std::endl;
+            child_line.second->draw(this_CP, empty_LP);
+            depth_queue_line.pop();
+        }
+        std::priority_queue<std::pair<double, sglBox *>, std::vector<std::pair<double, sglBox *>>, std::greater<std::pair<double, sglBox *>>> depth_queue;
+        for (auto b : in_figure_boxes)
+        {
+            double avg_x, avg_y, avg_z;
+            for (auto p : b->points)
+            {
+                avg_x += p->x();
+                avg_y += p->y();
+                avg_z += p->z();
+            }
+            avg_x = avg_x / b->points.size();
+            avg_y = avg_y / b->points.size();
+            avg_z = avg_z / b->points.size();
+            cv::Point3d avg_pos(avg_x, avg_y, avg_z);
+            double dist_from_cam = cv::norm(avg_pos - cam_pose);
+            depth_queue.push(std::make_pair(dist_from_cam, b));
+        }
+        // glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+        while (!depth_queue.empty())
+        {
+            auto child_box = depth_queue.top();
+            // std::cout << "Dist from cam: " << child_box.first << std::endl;
+            child_box.second->draw(this_CP, empty_LP);
+            depth_queue.pop();
+        }
+        // glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+        // glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+        // swap buffer
+        glutSwapBuffers();
+    }
+}
+
+// -------------------------------
+
+sglFigure::~sglFigure()
+{
+    allGlFigures.erase(winID);
+    // ~sglObject() takes care of destroying the children
+    // TODO: Close window
+}
+
+// -------------------------------
+
+// TODO: Instead of directly calling gl and glut functions in main thread, try registering a call to a '_init' function be called inside the glutMainLoopThread.
+void sglFigure::init(int argc, char *argv[])
+{
+    if (initiated) // nothing to initiate
+        return;
+
+    if (!glutInitiated)
+    {
+        XInitThreads();
+        glutInit(&argc, argv);
+        glutInitiated = true;
+    }
+
+    static GLfloat bright_light_ambient[] = {1.0, 1.0, 1.0, 1.0};
+
+    static GLfloat mat_ambient[] = {0.7, 0.7, 0.7, 1.0};
+    static GLfloat mat_diffuse[] = {0.8, 0.8, 0.8, 1.0};
+    static GLfloat mat_specular[] = {1.0, 1.0, 1.0, 1.0};
+    static GLfloat high_shininess[] = {100.0};
+
+    // glutInitDisplayMode(GLUT_RGB | GLUT_DEPTH | GLUT_DOUBLE); //glutInitDisplayMode(GLUT_DEPTH | GLUT_DOUBLE | GLUT_RGBA);
+    // glutInitWindowSize(OPENGL_WIN_SIZE, OPENGL_WIN_SIZE);
+    if (alpha() >= 0.0)
+    {
+        glutInitDisplayMode(GLUT_DEPTH | GLUT_DOUBLE | GLUT_RGBA); //(GLUT_SINGLE|GLUT_RGBA);
+        /*glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+        glEnable(GL_BLEND);*/
+        // glLightModeli(GL_LIGHT_MODEL_TWO_SIDE, GL_TRUE);
+        // glEnable(GL_BLEND); // Add alpha blending
+        // glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    }
+    else
+        glutInitDisplayMode(GLUT_DEPTH | GLUT_DOUBLE | GLUT_RGB);
+
+    glutInitWindowSize(width, height);
+    if (name == "<untitled>")
+        name = "OpenGL window " + std::to_string(allGlFigures.size());
+    winID = glutCreateWindow(name.c_str());
+
+    allGlFigures[winID] = this;
+
+    if (alpha() >= 0.0)
+    {
+        glEnable(GL_BLEND); // Add alpha blending
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    }
+
+    glShadeModel(GL_SMOOTH);
+    // glLightModeli(GL_LIGHT_MODEL_TWO_SIDE, GL_TRUE);
+    std::vector<double> &c = color();
+    glClearColor(c[0], c[1], c[2], 0.0f);
+    glClearDepth(1.0f);
+
+    // glViewport(-2.0, -2.0, 4.0, 4.0);
+    glMatrixMode(GL_PROJECTION);
+    glLoadIdentity();
+    // glRotated(90.0, 1.0, 0.0, 0.0);
+
+    // gluPerspective(30.0, 1.0, 0.1, 100.0); // perspective proj.
+    // glOrtho(-2.0, 2.0, -2.0, 2.0, 0.1, 100.0);
+    // glScalef(1.0f, -1.0f, 1.0f);
+    glOrtho(-1.0, 1.0, -1.0, 1.0, 0, 300.0);
+    // glFrustum(-1.0, 1.0, -1.0, 1.0, 1.5, 100.0);
+
+    glMatrixMode(GL_MODELVIEW);
+    glLoadIdentity();
+    // glScalef(1.0f, 1.0f, 1.0f);
+    glScalef(cam_scale, cam_scale, cam_scale);
+    if (!init_cam_config.empty())
+        gluLookAt(init_cam_config[0], init_cam_config[1], init_cam_config[2],
+                  init_cam_config[3], init_cam_config[4], init_cam_config[5],
+                  init_cam_config[6], init_cam_config[7], init_cam_config[8]);
+    else
+        gluLookAt(0.0, 0.0, -5.0, // camera location
+                  0.0, 0.0, 0.0,  // look at point
+                  0.0, 1.0, 0.0); // camera "up" direction
+
+    glutDisplayFunc(_globalDisplayFunction);
+    glutIdleFunc(_globalDisplayFunction);
+    // glutKeyboardUpFunc(KeyDownHandlerOpenGL);
+    glutKeyboardFunc(_globalKeyFunction);
+
+    zprReferencePoint[0] = 0.0;
+    zprReferencePoint[1] = 0.0;
+    zprReferencePoint[2] = 0.0;
+    zprInit();
+    // zprSelectionFunc(drawAxes);     /* Selection mode draw function */
+    // zprPickFunc(pick);              /* Pick event client callback   */
+
+    GLdouble gl_matrix[16];
+    glGetDoublev(GL_MODELVIEW_MATRIX, gl_matrix);
+    cv::Mat cv_matrix = cv::Mat::zeros(cv::Size(4, 4), CV_64F);
+    for (int i{0}; i < 4; i++)
+    {
+        for (int j{0}; j < 4; j++)
+        {
+            cv_matrix.at<double>(j, i) = gl_matrix[4 * i + j];
+        }
+    }
+    cv::Vec4d curr(0, 0, 0, 1);
+    cv::Mat cam_p = cv_matrix.inv() * cv::Mat(curr);
+    cam_pose = cv::Point3d(cam_p.at<double>(0), cam_p.at<double>(1), cam_p.at<double>(2));
+
+    // Setting up lights
+    for (int a = 0; a < lights.size(); ++a)
+    {
+        glLightfv(light_names[a], GL_AMBIENT, vector2array(lights[a].ambient)());
+        glLightfv(light_names[a], GL_DIFFUSE, vector2array(lights[a].diffuse)());
+        glLightfv(light_names[a], GL_SPECULAR, vector2array(lights[a].specular)());
+        glLightfv(light_names[a], GL_POSITION, vector2array(lights[a].position)());
+    }
+
+    glMaterialfv(GL_FRONT, GL_AMBIENT, mat_ambient);
+    glMaterialfv(GL_FRONT, GL_DIFFUSE, mat_diffuse);
+    glMaterialfv(GL_FRONT, GL_SPECULAR, mat_specular);
+    glMaterialfv(GL_FRONT, GL_SHININESS, high_shininess);
+
+    /* glEnable(GL_CULL_FACE); //<-- missing
+    glCullFace(GL_BACK); */
+    glLightModelfv(GL_LIGHT_MODEL_AMBIENT, bright_light_ambient);
+    // glLightModelfv(GL_LIGHT_MODEL_AMBIENT, light_ambient);
+
+    glEnable(GL_LIGHTING);
+    for (int a = 0; a < lights.size(); ++a)
+        glEnable(light_names[a]);
+
+    glDepthFunc(GL_LESS);
+    glEnable(GL_DEPTH_TEST);
+    glEnable(GL_NORMALIZE);
+    glEnable(GL_COLOR_MATERIAL);
+
+    if (!glutMainLoopCalled)
+    { // active
+        glutSetOption(GLUT_ACTION_ON_WINDOW_CLOSE, GLUT_ACTION_CONTINUE_EXECUTION);
+        glutMainLoopCalled = true;
+        glutMainLoopThread = std::thread([](void) -> void
+                                         { glutMainLoop(); });
+    }
+
+    // -------------
+    initiated = true;
+}
+
+// -------------------------------
+
+// TODO: Instead of directly calling gl and glut functions in main thread, try registering a call to a '_flush' function be called inside the glutMainLoopThread.
+void sglFigure::flush(void)
+{
+    int oldWinID = glutGetWindow();
+    glutSetWindow(winID);
+    glutPostRedisplay(); // glFlush();
+    glutSetWindow(oldWinID);
+}
+
+// TODO: Instead of directly calling gl and glut functions in main thread, try registering a call to a '_close' function be called inside the glutMainLoopThread.
+void sglFigure::close(void)
+{
+    int oldWinID = glutGetWindow();
+    allGlFigures.erase(winID);
+    glutDestroyWindow(winID);
+    if (allGlFigures.size() != 0 && oldWinID != winID)
+        glutSetWindow(oldWinID);
+}
+
+// -------------------------------
+
+unsigned char sglFigure::get_key(std::string msg)
+{
+    std::cout << msg;
+    waiting_for_keypress = true;
+    while (waiting_for_keypress)
+    {
+        std::this_thread::sleep_for(std::chrono::milliseconds(100)); // sleep
+    }
+    return (pressed_key);
+}
+
+// TODO: Instead of directly calling gl and glut functions in main thread, try registering a call to a '_save_as_image' function be called inside the glutMainLoopThread.
+bool sglFigure::save_as_image(const char *fname)
+{
+#if __opencv
+    cv::Mat image = cv::Mat::zeros(height, width, CV_8UC3);
+    cv::Mat temp;
+
+    glutSetWindow(winID);
+    GLint buff;
+    // glGetIntegerv(GL_DRAW_BUFFER,&buff);
+    glReadBuffer(GL_FRAMEBUFFER); //((GLenum)buff); //(GL_FRONT_LEFT);
+    glReadPixels(0, 0, width, height, GL_RGB, GL_UNSIGNED_BYTE, image.data);
+
+    cv::cvtColor(image, temp, CV_BGR2RGB);
+    cv::flip(temp, image, 0);
+
+    cv::imwrite(fname, temp);
+#else
+    std::cout << "'opencv' was not activated. Use  -D__opencv=1  compilation option to activate." << std::endl;
+    return (false);
+#endif
+}
+
+#endif
