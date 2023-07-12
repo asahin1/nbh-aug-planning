@@ -113,6 +113,7 @@ int main(int argc, char *argv[])
     search3D_inst.start_time = std::chrono::steady_clock::now();
     search3D_inst.search();
     search3D_inst.end_time = std::chrono::steady_clock::now();
+    std::cout << "Search complete. Press ESC to view paths." << std::endl;
     std::cout << "=============================================================" << std::endl;
     std::cout << "Computation time: " << std::chrono::duration_cast<std::chrono::seconds>(search3D_inst.end_time - search3D_inst.start_time).count() << "s" << std::endl;
 

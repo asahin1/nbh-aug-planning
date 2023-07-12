@@ -15,7 +15,6 @@ double R_HEURISTIC_WEIGHT;
 int R_ROLLBACK_RADIUS;
 double R_NEIGHBORHOOD_RADIUS;
 int R_NEIGHBORHOOD_SEARCH_DEPTH;
-int R_LINEAGE_DATA_GENERATION_THRESHOLD;
 bool R_CUT_POINT_CHECK;
 double R_CP_LOWER_THRESHOLD;
 double R_CP_UPPER_THRESHOLD;
@@ -215,7 +214,6 @@ public:
         R_ROLLBACK_RADIUS = param_container["ROLLBACK_RADIUS"].as<int>(1);
         R_NEIGHBORHOOD_RADIUS = param_container["NEIGHBORHOOD_RADIUS"].as<double>(1);
         R_NEIGHBORHOOD_SEARCH_DEPTH = param_container["NEIGHBORHOOD_SEARCH_DEPTH"].as<int>(1);
-        R_LINEAGE_DATA_GENERATION_THRESHOLD = param_container["LINEAGE_DATA_GENERATION_THRESHOLD"].as<int>(0);
         R_CUT_POINT_CHECK = param_container["CUT_POINT_CHECK"].as<bool>(0);
         R_CP_LOWER_THRESHOLD = param_container["CP_LOWER_THRESHOLD"].as<double>(1.0);
         R_CP_UPPER_THRESHOLD = param_container["CP_UPPER_THRESHOLD"].as<double>(1.0);
@@ -230,7 +228,6 @@ public:
         std::cout << "Rollback radius: " << R_ROLLBACK_RADIUS << std::endl;
         std::cout << "Neighborhood radius: " << R_NEIGHBORHOOD_RADIUS << std::endl;
         std::cout << "Neighborhood search depth: " << R_NEIGHBORHOOD_SEARCH_DEPTH << std::endl;
-        std::cout << "Lineage data generation threshold: " << R_LINEAGE_DATA_GENERATION_THRESHOLD << std::endl;
         std::cout << "Cut point check: " << R_CUT_POINT_CHECK << std::endl;
         if (R_CUT_POINT_CHECK)
         {

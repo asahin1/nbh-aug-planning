@@ -101,26 +101,16 @@ bool myNode3D::operator==(myNode3D &n)
     if (!isCoordsEqual(n)) // corrdinate based comparison (this is necessary)
         return (false);
 
-#ifdef DOSL_ALGORITHM_SStar
-    // if (y = 50 && x > 50)
-    if (genNo >= R_LINEAGE_DATA_GENERATION_THRESHOLD && n.genNo >= R_LINEAGE_DATA_GENERATION_THRESHOLD)
-    // if (lineage_data.generation > R_LINEAGE_DATA_GENERATION_THRESHOLD || n.lineage_data.generation > R_LINEAGE_DATA_GENERATION_THRESHOLD)
-    { // *SB: don't do this near the start
-#endif
-
-        if (isCutPoint || n.isCutPoint)
-        {
-            genNo = std::min(genNo, n.genNo);
-            return true;
-        }
-
-        if (!hasNeighborhoodIntersection(n))
-        {
-            return (false);
-        }
-#ifdef DOSL_ALGORITHM_SStar
+    if (isCutPoint || n.isCutPoint)
+    {
+        genNo = std::min(genNo, n.genNo);
+        return true;
     }
-#endif
+
+    if (!hasNeighborhoodIntersection(n))
+    {
+        return (false);
+    }
     genNo = std::min(genNo, n.genNo);
     return (true);
 }
