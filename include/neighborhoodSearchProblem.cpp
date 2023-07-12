@@ -2,23 +2,15 @@
 #include "dosl/planners/SStar_original.tcc"
 #include "dosl/planners/ThetaStar_original.tcc"
 
-// OpenCV
-#include <opencv2/opencv.hpp>
-#include <opencv2/highgui.hpp>
-
 #include <dosl/aux-utils/cvParseMap2d.hpp>
 
 #define SEARCH2_ALG AStar_original
-
-// #define HEURISTIC_WEIGHT 0.8
 
 template <class nodeType>
 class neighborhoodSearchNode : public SEARCH2_ALG::Node<neighborhoodSearchNode<nodeType>, double>
 {
 public:
-    nodeType *np; // required member of nodeType: unordered_map<nodeType*,double> successors;
-    // bool came_from_pinch_point; // *SB: allow neighborhood search to propagate through pinch points, but mark them.
-    // bool isCutPoint = false;
+    nodeType *np;
     int generation_no{0};
     neighborhoodSearchNode() {}
     neighborhoodSearchNode(nodeType *p) : np(p) {}
@@ -49,31 +41,31 @@ public:
     using SEARCH2_ALG::Algorithm<neighborhoodSearchProblem<nodeType>, neighborhoodSearchNode<nodeType>, double>::all_nodes_set_p;
 
     typedef neighborhoodSearchNode<nodeType> NSN;
-    NSN start;
-    int min_generations;
+    NSN centerNode;
+    int minSearchDepth;
     double nb_radius;
     double heuristic_weight;
     NSN primary_search_start;
-    cvParseMap2d my_map;
-    cv::Mat occupancyMap;
+    cvParseMap2d env2D;
+    cv::Mat env3D;
     // Alternatively
     std::unordered_set<nodeType *> neighborhood;
-    neighborhoodSearchProblem(nodeType *p, double nr, double hw, int mg, nodeType *s, cv::Mat primary_search_display)
-        : nb_radius(nr), heuristic_weight(hw), min_generations(mg)
+    neighborhoodSearchProblem(nodeType *p, double nr, double hw, int mg, nodeType *s)
+        : nb_radius(nr), heuristic_weight(hw), minSearchDepth(mg)
     {
-        start = NSN(p);
+        centerNode = NSN(p);
         primary_search_start = NSN(s);
     }
-    neighborhoodSearchProblem(nodeType *p, double nr, double hw, int mg, nodeType *s, cv::Mat primary_search_display, cvParseMap2d search_map)
-        : nb_radius(nr), heuristic_weight(hw), min_generations(mg), my_map(search_map)
+    neighborhoodSearchProblem(nodeType *p, double nr, double hw, int mg, nodeType *s, cvParseMap2d &search_map_2D)
+        : nb_radius(nr), heuristic_weight(hw), minSearchDepth(mg), env2D(search_map_2D)
     {
-        start = NSN(p);
+        centerNode = NSN(p);
         primary_search_start = NSN(s);
     }
-    neighborhoodSearchProblem(nodeType *p, double nr, double hw, int mg, nodeType *s, cv::Mat primary_search_display, cv::Mat occupancy_map)
-        : nb_radius(nr), heuristic_weight(hw), min_generations(mg), occupancyMap(occupancy_map)
+    neighborhoodSearchProblem(nodeType *p, double nr, double hw, int mg, nodeType *s, cv::Mat &search_map_3D)
+        : nb_radius(nr), heuristic_weight(hw), minSearchDepth(mg), env3D(search_map_3D)
     {
-        start = NSN(p);
+        centerNode = NSN(p);
         primary_search_start = NSN(s);
     }
 
@@ -111,7 +103,7 @@ public:
             xx = n1.np->x + a * xstep;
             yy = n1.np->y + a * ystep;
             zz = n1.np->z + a * zstep;
-            if (occupancyMap.at<int>((int)round(xx), (int)round(yy), (int)round(zz)))
+            if (env3D.at<int>((int)round(xx), (int)round(yy), (int)round(zz)))
                 return (false);
         }
         return (true);
@@ -127,7 +119,7 @@ public:
         {
             xx = n1.np->x + a * xstep;
             yy = n1.np->y + a * ystep;
-            if (my_map.isObstacle((int)round(xx), (int)round(yy)))
+            if (env2D.isObstacle((int)round(xx), (int)round(yy)))
                 return (false);
         }
         return (true);
@@ -147,7 +139,7 @@ public:
     std::vector<NSN> getStartNodes(void)
     {
         std::vector<NSN> startNodes;
-        startNodes.push_back(start);
+        startNodes.push_back(centerNode);
         return (startNodes);
     }
 
@@ -158,7 +150,7 @@ public:
             // _dosl_cout << "Secondary search: Arrived primary start" << _dosl_endl;
             return true;
         }
-        if (n.generation_no < min_generations)
+        if (n.generation_no < minSearchDepth)
             return false;
         if (n.g_score > nb_radius)
         {

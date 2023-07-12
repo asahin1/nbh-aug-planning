@@ -1,86 +1,106 @@
-{   'p_h1':                                                                   // Environment name
+{   'env_genus_1':                                                                   // Environment name
     {   environment:    {map_dims:  [10,10,20],                             // map dimensions
         obstacle_corners:  [[2,2,6],[2,6,6],[2,4,6],[6,4,6]],       // Obstacle corners
         obstacle_dims: [[6,2,8],[6,2,8],[2,2,8],[2,2,8]]         // Obstacle dimensions (x,y,z
                         },
-        init_cam:   [[-100,-55,50],[12,6.5,5],[0,0,1]],
-        cam_scale: 0.02, 
         start:  [1,1,1],                                                    // Start vertex
         goal:   [8,9,18],                                                    // Goal vertex
-
-        plot_options: { plot_scale: 3,
-                        line_thickness: 1,      
-                        vertex_size:    1.0},     
-
-        top_class:  2                                                       // Number of classes to find
+        init_cam:   [[-100,-55,50],[12,6.5,5],[0,0,1]],
+        cam_scale: 0.02, 
+        plot_options: {line_thickness: 1},     
+        n_paths:  2                                                       // Number of classes to find
     },
-    'p_h2':                                                                   // Environment name
+    'env_genus_2':                                                                   // Environment name
     {   environment:    {map_dims:  [20,10,20],                             // map dimensions
         obstacle_corners:  [[4,2,6],[4,6,6],[4,4,6],[14,4,6],[9,4,6]],       // Obstacle corners
         obstacle_dims: [[12,2,8],[12,2,8],[2,2,8],[2,2,8],[2,2,8]]         // Obstacle dimensions (x,y,z
                         },
+        start:  [1,1,1],                                                    // Start vertex
+        goal:   [8,9,18],                                                  // Goal vertex
         init_cam:   [[-100,-55,50],[12,6.5,5],[0,0,1]],
         cam_scale: 0.02, 
-        start:  [1,1,1],                                                    // Start vertex
-        goal:   [8,9,18],                                                    // Goal vertex
-
-        plot_options: { plot_scale: 3,
-                        line_thickness: 1,      
-                        vertex_size:    1.0},     
-
-        top_class:  3                                                       // Number of classes to find
+        plot_options: {line_thickness: 1},     
+        n_paths:  3                                                       // Number of classes to find
     },
-    'p_c1':
+    'env_chain':
     {                
         environment:    {map_dims:  [14,10,10],                             // map dimensions
         obstacle_corners:  [[0,0,4],[8,0,4],[2,0,4],[2,8,4],[4,4,0],[12,4,0],[6,4,0],[6,4,8]],       // Obstacle corners
         obstacle_dims: [[2,10,2],[2,10,2],[6,2,2],[6,2,2],[2,2,10],[2,2,10],[6,2,2],[6,2,2]],         // Obstacle dimensions (x,y,z)
         scale: 2                    
                 },
-        init_cam:   [[-100,-55,50],[12,6.5,5],[0,0,1]],
-        cam_scale: 0.02, 
         start:  [1,1,1],                                                    // Start vertex
         goal:   [12,9,8],                                                    // Goal vertex
-        plot_options: { plot_scale: 3,
-                        line_thickness: 1,      
-                        vertex_size:    1.0},     
-
-        top_class:  4                                                       // Number of classes to find
+        init_cam:   [[-100,-55,50],[12,6.5,5],[0,0,1]],
+        cam_scale: 0.02, 
+        plot_options: {line_thickness: 1},     
+        n_paths:  2                                                       // Number of classes to find
     },
     
-    'm2_x5':                                                                   // Environment name
+    'env_cube':                                                                   // Environment name
     {   environment:    {map_dims:  [47,47,47],                             // map dimensions
         obstacle_corners:  [[3,3,0]],       // Obstacle corners
         obstacle_dims: [[44,44,44]]         // Obstacle dimensions (x,y,z
                         },
-        // start:  [3,3,3],                                                    // Start vertex
         start:  [3,3,15],                                                    // Start vertex
-        // goal:   [25,25,47],
         // goal:   [5,20,47],                                                    // Goal vertex
         goal:   [15,15,47],                                                    // Goal vertex
-        // init_cam:   [[-60,-60,80],[0,0,50],[0,0,1]], 
         init_cam:   [[-100,-55,50],[12,6.5,5],[0,0,1]],
         cam_scale: 0.02, 
-
-        plot_options: { plot_scale: 3,
-                        line_thickness: 1,      
-                        vertex_size:    1.0},     
-
-        top_class:  2                                                       // Number of classes to find
+        plot_options: {line_thickness: 1},     
+        n_paths:  2                                                       // Number of classes to find
     },
     
-    'rect1':                                                                   // Environment name
+    'env_long_rectangle':                                                                   // Environment name
     {   environment:    {map_dims:  [10,20,80],                             // map dimensions
         obstacle_corners:  [[3,4,5]],       // Obstacle corners
         obstacle_dims: [[4,12,70]]         // Obstacle dimensions (x,y,z)
                         },
         start:  [1,8,20],                                                    // Start vertex
         goal:   [8,12,40],                                                    // Goal vertex
+        init_cam:   [[-100,-55,50],[12,6.5,5],[0,0,1]],
+        cam_scale: 0.02, 
+        plot_options: {line_thickness: 1},     
+        n_paths:  2                                                       // Number of classes to find
+    },
 
-        plot_options: { plot_scale: 3,
-                        line_thickness: 1,      
-                        vertex_size:    1.0},     
+    'env_building':                                                                   // Environment name
+    {   environment:    {map_dims:  [81,58,34],                             // map dimensions
+        obstacle_corners:  [[0,13,0],[24,13,0],[46,13,0],[65,13,0],[35,13,0],[35,42,0],[16,13,0],[16,13,25],[57,13,0],[57,13,17],[35,34,21]],       // Obstacle corners
+        obstacle_dims: [[16,11,34],[11,11,34],[11,11,34],[16,11,34],[11,21,34],[11,16,34],[8,11,17],[8,11,9],[8,11,9],[8,11,17],[11,8,13]]         // Obstacle dimensions (x,y,z)           
+        },
+        start: [50,9,0],
+        goal:   [32,27,8],                                                    // Goal vertex
+        init_cam:   [[-100,-55,50],[12,6.5,5],[0,0,1]],
+        cam_scale: 0.02, 
+        plot_options: {line_thickness: 1},     
+        n_paths:  2                                                       // Number of classes to find
+    },
 
-        top_class:  2                                                       // Number of classes to find
+    'env_trefoil_knot':                                                             // Environment name
+    {   environment:    {map_dims:  [14,14,14],                             // map dimensions
+        obstacle_corners:  [[0,0,4],[8,2,4],[8,12,6],[4,12,12],[4,4,12],[4,4,0],[6,4,0],[12,6,0],[12,8,2],[0,8,8],[0,0,8],[0,0,6]],       // Obstacle corners
+        obstacle_dims: [[10,2,2],[2,12,2],[2,2,8],[4,2,2],[2,8,2],[2,2,12],[8,2,2],[2,4,2],[2,2,8],[12,2,2],[2,8,2],[2,2,2]],         // Obstacle dimensions (x,y,z)
+        scale: 2
+                        },
+        start: [1,1,1],
+        goal:   [[3,7,11]],                                                    // Goal vertex
+        init_cam:   [[-100,-55,50],[12,6.5,5],[0,0,1]],
+        cam_scale: 0.02, 
+        plot_options: {line_thickness: 1},     
+        n_paths:  2                                                       // Number of classes to find
+    },
+
+    'building3':                                                                   // Environment name
+    {   environment:    {map_dims:  [21,15,21],                             // map dimensions
+        obstacle_corners:  [[0,4,0],[0,4,11],[7,4,0],[7,4,11],[11,4,0],[11,4,11],[18,4,0],[18,4,11],[3,4,0],[3,4,11],[3,4,18],[14,4,0],[14,4,7],[14,4,11],[0,4,10],[11,4,10],[16,4,10],[12,4,10],[12,10,10],[10,4,0],[10,9,0],[10,14,0],[10,6,0],[10,6,18],[10,11,7]],       // Obstacle corners
+        obstacle_dims: [[3,1,10],[3,1,10],[3,1,10],[3,1,10],[3,1,10],[3,1,10],[3,1,10],[3,1,10],[4,1,10],[4,1,3],[4,1,3],[4,1,3],[4,1,3],[4,1,10],[10,1,1],[1,11,1],[5,11,1],[4,2,1],[4,5,1],[1,2,21],[1,2,21],[1,1,21],[1,3,11],[1,3,3],[1,3,14]]         // Obstacle dimensions (x,y,z)           
+        },
+        start: [10,1,5],
+        goal:   [[2,7,10]],                                                    // Goal vertex
+        init_cam:   [[-100,-55,50],[12,6.5,5],[0,0,1]],
+        cam_scale: 0.02, 
+        plot_options: {line_thickness: 1},     
+        n_paths:  2                                                       // Number of classes to find
     }
 }

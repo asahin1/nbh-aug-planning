@@ -10,6 +10,7 @@
 // User made
 #include "myNode2D.hpp" // myNode class based on DOSL
 
+// Global variables (algorithm parameters)
 double R_HEURISTIC_WEIGHT;
 int R_ROLLBACK_RADIUS;
 double R_NEIGHBORHOOD_RADIUS;
@@ -23,14 +24,6 @@ double R_CP_PATH_PORTION;
 double R_CP_GSCORE_DIFF;
 double R_CPR_RADIUS;
 
-int VIS_INTERVAL = 1000; // used for speeding and slowing display/search
-int REPORT_INTERVAL = 1000;
-
-double NONUNIFORM_COST_MULTIPLIER;
-double PLOT_SCALE; // scale read from json file (effects how large the display window looks)
-
-COORD_TYPE MAX_X, MIN_X, MAX_Y, MIN_Y; // boundaries of the map - set at searchProblem constructor
-
 class CompareByCoordOnly
 { // functor for invoking isCoordsEqual (required for getting all nodes at a coordinate)
 public:
@@ -41,26 +34,33 @@ public:
 class searchProblem2D : public _DOSL_ALGORITHM::Algorithm<searchProblem2D, myNode2D, double>
 {
 public:
-    // Fime names and JSON objects
+    // Fime names and JSON containers
     std::string map_image_fName, plot_image_fName, expt_fName, expt_folderName, expt_Name, param_fName;
     RSJresource expt_container, param_container;
+
+    // Environment variables
     cvParseMap2d parsedMap;
-    cv::Mat originalMapMatrix;
+    COORD_TYPE MAX_X, MIN_X, MAX_Y, MIN_Y; // boundaries of the map - set at searchProblem constructor
     int nPathsToFind;
     bool nonuniform;
-    // Image display variables / parameters
-    cv::Mat image_to_display;
-    cv::Mat cleanMap;
-
-    double LINE_THICKNESS;
-
-    // variables decsribing problem
+    double NONUNIFORM_COST_MULTIPLIER;
     myNode2D startNode, goalNode, lastExpanded;
 
-    // homotopy classes
+    // Visualization
+    cv::Mat originalMapMatrix;
+    cv::Mat image_to_display;
+    cv::Mat cleanMap;
+    double PLOT_SCALE; // scale read from json file (effects how large the display window looks)
+    double LINE_THICKNESS;
+
+    int VIS_INTERVAL = 1000; // used for speeding and slowing display/search
+    int REPORT_INTERVAL = 1000;
+
+    // Path progress
     int nPathsFound;
     std::vector<myNode2D> foundGoals;
 
+    // Timing
     std::chrono::_V2::steady_clock::time_point start_time;
     std::chrono::_V2::steady_clock::time_point current_time;
     std::chrono::_V2::steady_clock::time_point end_time;
@@ -74,6 +74,7 @@ public:
         return (cvPoint(round(PLOT_SCALE * (x - MIN_X)), round(PLOT_SCALE * (y - MIN_Y))));
     }
 
+    // Plotting functions
     void cvPlotPoint(cv::Mat &img, CvPoint pt, CvScalar colr, int size = 1)
     {
         for (int i = pt.x; i <= pt.x + (size - 1); i++)
@@ -83,6 +84,17 @@ public:
                     continue;
                 img.at<cv::Vec3b>(j, i) = cv::Vec3b((uchar)colr.val[0], (uchar)colr.val[1], (uchar)colr.val[2]);
             }
+    }
+
+    void plotNode(cv::Mat &img, myNode2D n, CvScalar col)
+    {
+        cvPlotPoint(img, cv_plot_coord(n.x, n.y), col, PLOT_SCALE);
+    }
+
+    void plotCutPoint(myNode2D n)
+    {
+        plotNode(image_to_display, n, cvScalar(0, 165, 255));
+        plotNode(cleanMap, n, cvScalar(0, 165, 255));
     }
 
     void cvPlotStartGoal(cv::Mat &img)
@@ -114,6 +126,44 @@ public:
         cv::Point goal_text_start(goal.x - 10, goal.y + 10);
         cv::putText(img, "G", goal_text_start, cv::FONT_HERSHEY_SIMPLEX,
                     1, cvScalar(0, 0, 0), 2, cv::LINE_AA);
+    }
+
+    void popUpText(std::string text)
+    {
+        cv::Mat temp_img = image_to_display.clone();
+        cv::Size textSize = cv::getTextSize(text, cv::FONT_HERSHEY_SIMPLEX, 1, 2, 0);
+        cv::Point boxTopLeftCorner(image_to_display.size().width / 2 - textSize.width / 2 - 20,
+                                   image_to_display.size().height / 2 - textSize.height / 2 - 20);
+        cv::Point boxBottomRightCorner(image_to_display.size().width / 2 + textSize.width / 2 + 20,
+                                       image_to_display.size().height / 2 + textSize.height / 2 + 20);
+        cv::rectangle(image_to_display, boxTopLeftCorner, boxBottomRightCorner,
+                      cvScalar(0, 0, 255), cv::FILLED, cv::LINE_AA);
+        cv::putText(image_to_display, text,
+                    cv::Point(image_to_display.size().width / 2 - textSize.width / 2,
+                              image_to_display.size().height / 2 - textSize.height / 2 + 20),
+                    cv::FONT_HERSHEY_SIMPLEX, 1, cvScalar(255, 255, 255), 2, cv::LINE_AA);
+        cv::imshow("Display window", image_to_display);
+        cv::waitKey(0);
+        image_to_display = temp_img.clone();
+    }
+
+    void plotPath(cv::Mat &img, std::vector<std::unordered_map<myNode2D *, double>> &path, CvScalar col)
+    {
+        myNode2D thisPt = startNode, lastPt;
+        for (int a = path.size() - 1; a >= 0; --a)
+        {
+            lastPt = thisPt;
+            thisPt = myNode2D(0.0, 0.0);
+            for (auto it = path[a].begin(); it != path[a].end(); ++it)
+            {
+                thisPt.x += it->second * it->first->x;
+                thisPt.y += it->second * it->first->y;
+            }
+            cv::line(img,
+                     cv_plot_coord(thisPt.x, thisPt.y), cv_plot_coord(lastPt.x, lastPt.y),
+                     col,
+                     LINE_THICKNESS * PLOT_SCALE * 0.5);
+        }
     }
 
     // Constructor
@@ -218,24 +268,14 @@ public:
         image_to_display = originalMapMatrix.clone();
         cv::resize(image_to_display, image_to_display, cv::Size(), PLOT_SCALE, PLOT_SCALE);
         cleanMap = image_to_display.clone(); // copy resized version of original map, store as a clean copy
-        // for (int i = 0; i < MAX_X; i++)
-        //     for (int j = 0; j < MAX_Y; j++)
-        //     {
-        //         cv::Vec3b color = originalMapMatrix.at<cv::Vec3b>(cv::Point(i, j));
-        //         if (color.val[0] == 0 && color.val[1] == 0 && color.val[2] == 0)
-        //             cleanMap.at<cv::Vec3b>(j, i) = cv::Vec3b((uchar)0, (uchar)0, (uchar)0);
-        //         else
-        //             cleanMap.at<cv::Vec3b>(j, i) = cv::Vec3b((uchar)color.val[2], (uchar)color.val[2], (uchar)255);
-        //     }
         // Display window
         cv::namedWindow("Display window", cv::WINDOW_AUTOSIZE);
         cv::moveWindow("Display window", 50, 50);
+        popUpText("Press any key to show start and goal");
         cv::imshow("Display window", image_to_display);
-        // cv::imshow("Original window", cleanMap);
-        char key = (char)cv::waitKey(0); // explicit cast
         cvPlotStartGoal(image_to_display);
         cv::imshow("Display window", image_to_display);
-        cv::waitKey(0); // explicit cast
+        popUpText("Press any key to start the search");
         cvPlotStartGoal(cleanMap);
         // Set planner variables
         all_nodes_set_p->reserve(ceil(MAX_X - MIN_X + 1));
@@ -274,7 +314,6 @@ public:
     {
         double cost_multiplier{0};
         cv::Vec3b color = originalMapMatrix.at<cv::Vec3b>(cv::Point(x, y));
-        // cost_multiplier = 1.0 + NONUNIFORM_COST_MULTIPLIER * (255.0 - color.val[2]) / 255.0;
         cost_multiplier = 1.0 + NONUNIFORM_COST_MULTIPLIER * (255.0 - color.val[0]) / 255.0;
         return cost_multiplier;
     }
@@ -291,7 +330,6 @@ public:
 
     void getSuccessors(myNode2D &n, std::vector<myNode2D> *s, std::vector<double> *c) // *** This must be defined
     {
-        n.lineage_data = n.parent->lineage_data;
 
         myNode2D tn; // dummy node instance
         tn.genNo = n.genNo + 1;
@@ -329,17 +367,9 @@ public:
                     cost_multiplier = getCostMultiplier(tn, n);
                 }
                 double computed_cost{cost_multiplier * sqrt(a * a + b * b)};
-                tn.transition_cost = computed_cost;
-
-                // Clear previous parents
-                tn.parent_list.clear();
-                // Insert new parent
-                tn.parent_list.insert(std::make_pair(tn.parent, tn.transition_cost));
 
                 s->push_back(tn);
                 c->push_back(computed_cost);
-
-                // c->push_back(sqrt(dx*dx+dy*dy));
             }
     }
 
@@ -381,9 +411,7 @@ public:
     {
         std::vector<myNode2D> startNodes;
         startNodes.push_back(startNode);
-        cvPlotPoint(image_to_display, cv_plot_coord(startNode.x, startNode.y), cvScalar(0, 0, 0), PLOT_SCALE);
-        // cvPlotPoint(cleanMap, cv_plot_coord(startNode.x, startNode.y), cvScalar(255, 0, 0), PLOT_SCALE * 2);
-
+        // plotNode(image_to_display, startNode, cvScalar(0, 0, 0));
         return (startNodes);
     }
 
@@ -440,14 +468,13 @@ public:
             n.getNeighborhood(R_NEIGHBORHOOD_RADIUS, R_NEIGHBORHOOD_SEARCH_DEPTH);
             col = cvScalar(100.0, 100.0, 100.0);
         }
-        // #endif
 
         else if (e & ERROR)
         {
             _dosl_cout << "\033[1;34;47m================================ nodeEvent (ERROR) start =================================\033[0m\n"
                        << _dosl_endl;
             col = cvScalar(120, 100, 200);
-            cvPlotPoint(image_to_display, cv_plot_coord(n.x, n.y), col, PLOT_SCALE); // plot this point
+            plotNode(image_to_display, n, col);
             cv::imshow("Display window", image_to_display);
             cvWaitKey();
             current_time = std::chrono::steady_clock::now();
@@ -459,10 +486,10 @@ public:
         //-------------------------------------------
 
         if (n.x < MAX_X && n.y < MAX_Y && parsedMap.isFree(round(n.x), round(n.y)))
-            cvPlotPoint(image_to_display, cv_plot_coord(n.x, n.y), col, PLOT_SCALE);
+            plotNode(image_to_display, n, col);
 
         if (n.isCutPoint)
-            cvPlotPoint(image_to_display, cv_plot_coord(n.x, n.y), col, PLOT_SCALE);
+            plotCutPoint(n);
 
         if (expand_count % VIS_INTERVAL == 0 || node_heap_p->size() == 0)
         {

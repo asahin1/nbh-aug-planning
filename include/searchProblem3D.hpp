@@ -8,82 +8,102 @@
 #include "RSJparser.tcc"
 // User made
 #include "myNode3D.hpp" // myNode class based on DOSL
+
 #include "sgl/sgl"
 #define bool bool
 
-#define VIS 1
-
-#define OVERLAP_VIS false
-
-double R_EDGE_LENGTH;
 double R_HEURISTIC_WEIGHT;
-int R_ROLLBACK;
+int R_ROLLBACK_RADIUS;
 double R_NEIGHBORHOOD_RADIUS;
-double R_NEIGHBORHOOD_INNER_RADIUS;
-int R_MIN_NB_GENERATIONS;
+int R_NEIGHBORHOOD_SEARCH_DEPTH;
 int R_LINEAGE_DATA_GENERATION_THRESHOLD;
-double R_NEIGHBORHOOD_OVERLAP_THRESHOLD;
-int R_NEIGHBORHOOD_SIZE_THRESHOLD;
-bool R_MP_CHECK;
-double R_MP_LOWER_THRESHOLD;
-double R_MP_UPPER_THRESHOLD;
-double R_OVERLAP_FOR_MP;
-double R_MP_PATH_LENGTH;
-double R_MP_GSCORE_DIFF;
-double R_MP_REGION_RADIUS;
-bool R_PLOT_NEIGHBORHOOD;
-bool R_PLOT_MP_NB;
-
-int VIS_PAUSE = 0;    // cv::waitKey argument (useful for slowing and speeding the plot)
-int VIS_INTERVAL = 1; // used for speeding and slowing display/search
-double PLOT_SCALE;    // scale read from json file (effects how large the display window looks)
-// COORD_TYPE MAX_X, MIN_X, MAX_Y, MIN_Y, MAX_Z, MIN_Z;
-
-double edges[][3] = {{-1.0, 0.0, 0.0}, {1.0, 0.0, 0.0}, {0.0, -1.0, 0.0}, {0.0, 1.0, 0.0}, {-1.0, -1.0, -1.0}, {1.0, 1.0, 1.0}, {1.0, -1.0, 0.0}, {-1.0, 1.0, 0.0}, {0.0, -1.0, -1.0}, {0.0, 1.0, 1.0}, {-1.0, 0.0, -1.0}, {1.0, 0.0, 1.0}, {0.0, 0.0, -1.0}, {0.0, 0.0, 1.0}};
+bool R_CUT_POINT_CHECK;
+double R_CP_LOWER_THRESHOLD;
+double R_CP_UPPER_THRESHOLD;
+double R_OVERLAP_FOR_CP;
+double R_CP_PATH_PORTION;
+double R_CP_GSCORE_DIFF;
+double R_CPR_RADIUS;
 
 class CompareByCoordOnly
 { // functor for invoking isCoordsEqual (required for getting all nodes at a coordinate)
 public:
-    bool operator()(const myNode &n1, const myNode &n2) { return n1.isCoordsEqual(n2); }
+    bool operator()(const myNode3D &n1, const myNode3D &n2) { return n1.isCoordsEqual(n2); }
 } compare_by_coord_only;
 
 // Implementation of searchProblem class
-class searchProblem : public _DOSL_ALGORITHM::Algorithm<searchProblem, myNode, double>
+class searchProblem3D : public _DOSL_ALGORITHM::Algorithm<searchProblem3D, myNode3D, double>
 {
 public:
-    // Fime names and JSON objects
-    std::string map_image_fName, plot_image_fName, expt_fName, expt_folderName, expt_Name, param_fName;
+    // Fime names and JSON containers
+    std::string map_image_fName, expt_fName, expt_folderName, expt_Name, param_fName;
     RSJresource expt_container, param_container;
-    int nClassesToFind;
 
-    // Image display variables / parameters
-    COORD_TYPE MAX_X, MIN_X, MAX_Y, MIN_Y, MAX_Z, MIN_Z;
+    // Environment variables
     int env_scale;
+    COORD_TYPE MAX_X, MIN_X, MAX_Y, MIN_Y, MAX_Z, MIN_Z;
     std::vector<cv::Point3d> obstacleCorners;
     std::vector<cv::Point3d> obstacleDims;
     cv::Mat occupancyMap;
+    int nPathsToFind;
+    myNode3D startNode, goalNode, lastExpanded;
+
+    // Visualization
+    sglFigure figure_to_display;
     std::vector<std::vector<std::vector<sglBox *>>> displayBoxes;
-    std::vector<std::vector<std::vector<sglBox *>>> overlapBoxes;
-    std::vector<std::vector<std::vector<bool>>> visibleBoxes;
-    myNode startNode, goalNode, lastExpanded;
+    double LINE_THICKNESS;
 
-    // homotopy classes
-    int nClasses;
-    std::vector<myNode> homotopyGoals;
+    int REPORT_INTERVAL = 100;
 
+    // Path progress
+    int nPathsFound;
+    std::vector<myNode3D> foundGoals;
+
+    // Timing
     std::chrono::_V2::steady_clock::time_point start_time;
     std::chrono::_V2::steady_clock::time_point current_time;
     std::chrono::_V2::steady_clock::time_point end_time;
 
-    // visuals
-    sglFigure my_fig;
-    int highest_visible_layer = 0;
-    bool clr;
-    cv::Mat image_to_display; // dummy for 2D compatibility
+    // Discretization related
+    double edges[14][3] = {{-1.0, 0.0, 0.0}, {1.0, 0.0, 0.0}, {0.0, -1.0, 0.0}, {0.0, 1.0, 0.0}, {-1.0, -1.0, -1.0}, {1.0, 1.0, 1.0}, {1.0, -1.0, 0.0}, {-1.0, 1.0, 0.0}, {0.0, -1.0, -1.0}, {0.0, 1.0, 1.0}, {-1.0, 0.0, -1.0}, {1.0, 0.0, 1.0}, {0.0, 0.0, -1.0}, {0.0, 0.0, 1.0}};
 
+    void plotNode(myNode3D n, std::vector<double> col)
+    {
+        displayBoxes.at(n.x).at(n.y).at(n.z)->color() = col;
+        displayBoxes.at(n.x).at(n.y).at(n.z)->visible() = true;
+    }
+
+    void plotCutPoint(myNode3D n)
+    {
+        plotNode(n, {1, 0.6, 0});
+        figure_to_display.flush();
+        sleep(0.5);
+    }
+
+    void plotPath(std::vector<std::unordered_map<myNode3D *, double>> &path, std::vector<double> col)
+    {
+        myNode3D thisPt = startNode, lastPt;
+        std::vector<myNode3D> allPts;
+        std::vector<myNode3D> path_vec;
+        for (int a = path.size() - 1; a >= 0; --a)
+        {
+            lastPt = thisPt;
+            thisPt = myNode3D(0.0, 0.0, 0.0);
+            for (auto it = path[a].begin(); it != path[a].end(); ++it)
+            {
+                thisPt.x += it->second * it->first->x;
+                thisPt.y += it->second * it->first->y;
+                thisPt.z += it->second * it->first->z;
+            }
+            sglLine *line = figure_to_display.addChild(sglLine(lastPt.x, lastPt.y, lastPt.z, thisPt.x, thisPt.y, thisPt.z));
+            line->linewidth() = LINE_THICKNESS * 30;
+            line->color() = col;
+            // sglSphere *sph = figure_to_display.addChild(sglSphere(p2.x, p2.y, p2.z, 0.1, 0.5, 0.5, 0.5));
+        }
+    }
     // -----------------------------------------------------------
     // Constructor
-    searchProblem(std::string expt_f_name, std::string expt_name, std::string param_f_name, std::string param_setName)
+    searchProblem3D(std::string expt_f_name, std::string expt_name, std::string param_f_name, std::string param_setName)
     {
         expt_fName = expt_f_name;
         expt_Name = expt_name;
@@ -96,7 +116,6 @@ public:
         expt_container = RSJresource(my_fstream)[expt_Name];
         std::ifstream param_fstream(param_fName);
         param_container = RSJresource(param_fstream)[param_setName];
-        clr = true;
 
         // Loading map
         if (expt_container["environment"].exists())
@@ -111,7 +130,7 @@ public:
             MIN_X = 0;
             MIN_Y = 0;
             MIN_Z = 0;
-#if VIS
+
             for (int i{MIN_X}; i < MAX_X + 1; i++)
             {
                 std::vector<std::vector<sglBox *>> xBoxes;
@@ -120,7 +139,7 @@ public:
                     std::vector<sglBox *> yBoxes;
                     for (int k{MIN_Z}; k < MAX_Z + 1; k++)
                     {
-                        sglBox *curr_box = my_fig.addChild(sglBox(i, j, k, i + 1, j + 1, k + 0.05, 1, 1, 1));
+                        sglBox *curr_box = figure_to_display.addChild(sglBox(i, j, k, i + 1, j + 1, k + 0.05, 1, 1, 1));
                         curr_box->visible() = false;
                         yBoxes.push_back(curr_box);
                     }
@@ -128,7 +147,7 @@ public:
                 }
                 displayBoxes.push_back(xBoxes);
             }
-#endif
+
             int out[3] = {MAX_X, MAX_Y, MAX_Z};
             occupancyMap = cv::Mat(3, out, CV_32S, cv::Scalar(0));
             for (auto c : expt_container["environment"]["obstacle_corners"].as_array())
@@ -151,7 +170,6 @@ public:
             exit(0);
         }
         _dosl_cout << _BOLD _GREEN << "Environment loaded!" << GREEN_ BOLD_ << _dosl_endl;
-        // int ctct{0};
         for (int o{0}; o < obstacleCorners.size(); o++)
         {
             cv::Point3d corner = obstacleCorners[o];
@@ -163,49 +181,55 @@ public:
                     for (int k{corner.z}; k < corner.z + dims.z; k++)
                     {
                         occupancyMap.at<int>(i, j, k) = 1;
-                        // ctct++;
                     }
                 }
             }
         }
-        // _dosl_cout << "ctct1: " << ctct << _dosl_endl;
         _dosl_cout << _BOLD _GREEN << "Occupancy Map generated!" << GREEN_ BOLD_ << _dosl_endl;
 
+        LINE_THICKNESS = expt_container["plot_options"]["line_thickness"].as<double>(2.0); // CV_FILLED
+
+        R_HEURISTIC_WEIGHT = param_container["HEURISTIC_WEIGHT"].as<double>(1.0);
+        R_ROLLBACK_RADIUS = param_container["ROLLBACK_RADIUS"].as<int>(1);
+        R_NEIGHBORHOOD_RADIUS = param_container["NEIGHBORHOOD_RADIUS"].as<double>(1);
+        R_NEIGHBORHOOD_SEARCH_DEPTH = param_container["NEIGHBORHOOD_SEARCH_DEPTH"].as<int>(1);
+        R_LINEAGE_DATA_GENERATION_THRESHOLD = param_container["LINEAGE_DATA_GENERATION_THRESHOLD"].as<int>(0);
+        R_CUT_POINT_CHECK = param_container["CUT_POINT_CHECK"].as<bool>(0);
+        R_CP_LOWER_THRESHOLD = param_container["CP_LOWER_THRESHOLD"].as<double>(1.0);
+        R_CP_UPPER_THRESHOLD = param_container["CP_UPPER_THRESHOLD"].as<double>(1.0);
+        R_OVERLAP_FOR_CP = param_container["OVERLAP_FOR_CP"].as<double>(1.0);
+        R_CP_PATH_PORTION = param_container["CP_PATH_PORTION"].as<double>(1.0);
+        R_CP_GSCORE_DIFF = param_container["CP_GSCORE_DIFF"].as<double>(1.0);
+        R_CPR_RADIUS = param_container["CPR_RADIUS"].as<double>(1.0);
+
+        std::cout << "=============================================================" << std::endl;
+        std::cout << "Running with algorithm parameter set: " << param_setName << std::endl;
+        std::cout << "Heuristic weight: " << R_HEURISTIC_WEIGHT << std::endl;
+        std::cout << "Rollback radius: " << R_ROLLBACK_RADIUS << std::endl;
+        std::cout << "Neighborhood radius: " << R_NEIGHBORHOOD_RADIUS << std::endl;
+        std::cout << "Neighborhood search depth: " << R_NEIGHBORHOOD_SEARCH_DEPTH << std::endl;
+        std::cout << "Lineage data generation threshold: " << R_LINEAGE_DATA_GENERATION_THRESHOLD << std::endl;
+        std::cout << "Cut point check: " << R_CUT_POINT_CHECK << std::endl;
+        if (R_CUT_POINT_CHECK)
+        {
+            std::cout << "Cut point overlap threshold: " << R_OVERLAP_FOR_CP << std::endl;
+            std::cout << "Cut point lower threshold: " << R_CP_LOWER_THRESHOLD << std::endl;
+            std::cout << "Cut point upper threshold: " << R_CP_UPPER_THRESHOLD << std::endl;
+            std::cout << "Cut point path portion: " << R_CP_PATH_PORTION << std::endl;
+            std::cout << "Cut point g-score diff: " << R_CP_GSCORE_DIFF << std::endl;
+            std::cout << "Cut point region radius: " << R_CPR_RADIUS << std::endl;
+        }
+
         // read data for planning
-        startNode = myNode(expt_container["start"][0].as<int>(), expt_container["start"][1].as<int>(), expt_container["start"][2].as<int>()) * env_scale;
-        startNode.print("Start Node: ");
+        startNode = myNode3D(expt_container["start"][0].as<int>(), expt_container["start"][1].as<int>(), expt_container["start"][2].as<int>()) * env_scale;
         startNode.parent = &startNode;
-        goalNode = myNode(expt_container["goal"][0].as<int>(), expt_container["goal"][1].as<int>(), expt_container["goal"][2].as<int>()) * env_scale;
+        goalNode = myNode3D(expt_container["goal"][0].as<int>(), expt_container["goal"][1].as<int>(), expt_container["goal"][2].as<int>()) * env_scale;
 
-#if REGULAR_SEARCH
-        nClassesToFind = 1;
-#else
-        nClassesToFind = expt_container["top_class"].as<int>(2);
-#endif
-        nClasses = 0;
+        nPathsToFind = expt_container["n_paths"].as<int>(2);
+        nPathsFound = 0;
 
-        R_EDGE_LENGTH = param_container["EDGE_LENGTH"].as<double>();
-        R_HEURISTIC_WEIGHT = param_container["HEURISTIC_WEIGHT"].as<double>();
-        R_ROLLBACK = param_container["ROLLBACK"].as<int>();
-        R_NEIGHBORHOOD_RADIUS = param_container["NEIGHBORHOOD_RADIUS"].as<double>();
-        R_NEIGHBORHOOD_INNER_RADIUS = param_container["NEIGHBORHOOD_INNER_RADIUS"].as<double>();
-        R_MIN_NB_GENERATIONS = param_container["MIN_NB_GENERATIONS"].as<int>();
-        R_LINEAGE_DATA_GENERATION_THRESHOLD = param_container["LINEAGE_DATA_GENERATION_THRESHOLD"].as<int>();
-        R_NEIGHBORHOOD_OVERLAP_THRESHOLD = param_container["NEIGHBORHOOD_OVERLAP_THRESHOLD"].as<double>();
-        R_NEIGHBORHOOD_SIZE_THRESHOLD = param_container["NEIGHBORHOOD_SIZE_THRESHOLD"].as<int>();
-        R_MP_CHECK = param_container["MP_CHECK"].as<bool>();
-        R_MP_LOWER_THRESHOLD = param_container["MP_LOWER_THRESHOLD"].as<double>();
-        R_MP_UPPER_THRESHOLD = param_container["MP_UPPER_THRESHOLD"].as<double>();
-        R_OVERLAP_FOR_MP = param_container["OVERLAP_FOR_MP"].as<double>();
-        R_MP_PATH_LENGTH = param_container["MP_PATH_LENGTH"].as<double>();
-        R_MP_GSCORE_DIFF = param_container["MP_GSCORE_DIFF"].as<double>();
-        R_MP_REGION_RADIUS = param_container["MP_REGION_RADIUS"].as<double>();
-        R_PLOT_NEIGHBORHOOD = param_container["plot_neighborhood"].as<bool>();
-        R_PLOT_MP_NB = param_container["plot_mergepoint_nb"].as<bool>();
-
-#if VIS
-        my_fig.height = 1200;
-        my_fig.width = 1200;
+        figure_to_display.height = 1200;
+        figure_to_display.width = 1200;
         if (expt_container["init_cam"].exists())
         {
             std::cout << "Init cam matrix: " << std::endl;
@@ -217,11 +241,11 @@ public:
                 for (int j{0}; j < cv.size() - 1; j++)
                 {
                     double val = cv.as_array().at(j).as<double>();
-                    my_fig.init_cam_config.push_back(val);
+                    figure_to_display.init_cam_config.push_back(val);
                     std::cout << val << ", ";
                 }
                 double val = cv.as_array().at(cv.size() - 1).as<double>();
-                my_fig.init_cam_config.push_back(val);
+                figure_to_display.init_cam_config.push_back(val);
                 std::cout << val;
                 std::cout << "]" << std::endl;
             }
@@ -230,50 +254,62 @@ public:
             for (int j{0}; j < cv.size() - 1; j++)
             {
                 double val = cv.as_array().at(j).as<double>();
-                my_fig.init_cam_config.push_back(val);
+                figure_to_display.init_cam_config.push_back(val);
                 std::cout << val << ", ";
             }
             double val = cv.as_array().at(cv.size() - 1).as<double>();
-            my_fig.init_cam_config.push_back(val);
+            figure_to_display.init_cam_config.push_back(val);
             std::cout << val;
             std::cout << "]";
             std::cout << "]" << std::endl;
             if (expt_container["cam_scale"].exists())
             {
                 double cam_scale = expt_container["cam_scale"].as<double>();
-                my_fig.cam_scale = cam_scale;
+                figure_to_display.cam_scale = cam_scale;
             }
         }
-        my_fig.init();
 
-        my_fig.addChild(sglLine(MIN_X, MIN_Y, MIN_Z, MAX_X, MIN_Y, MIN_Z, 0, 0, 0));
-        my_fig.addChild(sglLine(MIN_X, MIN_Y, MIN_Z, MIN_X, MAX_Y, MIN_Z, 0, 0, 0));
-        my_fig.addChild(sglLine(MIN_X, MIN_Y, MIN_Z, MIN_X, MIN_Y, MAX_Z, 0, 0, 0));
-        my_fig.addChild(sglLine(MAX_X, MIN_Y, MIN_Z, MAX_X, MIN_Y, MAX_Z, 0, 0, 0));
-        my_fig.addChild(sglLine(MAX_X, MIN_Y, MIN_Z, MAX_X, MAX_Y, MIN_Z, 0, 0, 0));
-        my_fig.addChild(sglLine(MIN_X, MIN_Y, MAX_Z, MAX_X, MIN_Y, MAX_Z, 0, 0, 0));
-        my_fig.addChild(sglLine(MIN_X, MIN_Y, MAX_Z, MIN_X, MAX_Y, MAX_Z, 0, 0, 0));
-        my_fig.addChild(sglLine(MIN_X, MAX_Y, MIN_Z, MIN_X, MAX_Y, MAX_Z, 0, 0, 0));
-        my_fig.addChild(sglLine(MIN_X, MAX_Y, MIN_Z, MAX_X, MAX_Y, MIN_Z, 0, 0, 0));
-        my_fig.addChild(sglLine(MAX_X, MIN_Y, MAX_Z, MAX_X, MAX_Y, MAX_Z, 0, 0, 0));
-        my_fig.addChild(sglLine(MAX_X, MAX_Y, MIN_Z, MAX_X, MAX_Y, MAX_Z, 0, 0, 0));
-        my_fig.addChild(sglLine(MIN_X, MAX_Y, MAX_Z, MAX_X, MAX_Y, MAX_Z, 0, 0, 0));
+        std::cout << "=============================================================" << std::endl;
+        std::cout << "Running with map parameters: " << expt_Name << std::endl;
+        std::cout << "Environment scale: " << env_scale << std::endl;
+        std::cout << "Line thickness: " << LINE_THICKNESS << std::endl;
+        std::cout << "Number of paths to find: " << nPathsToFind << std::endl;
+        startNode.print("Start Node: ");
+        goalNode.print("Goal Node: ");
+        std::cout << "=============================================================" << std::endl;
 
-        my_fig.addChild(sglLine(MIN_X, MIN_Y, MIN_Z, MAX_X * 10, MIN_Y, MIN_Z, 1, 0, 0));
-        my_fig.addChild(sglLine(MIN_X, MIN_Y, MIN_Z, MIN_X, MAX_Y * 10, MIN_Z, 0, 1, 0));
-        my_fig.addChild(sglLine(MIN_X, MIN_Y, MIN_Z, MIN_X, MIN_Y, MAX_Z * 10, 0, 0, 1));
-
+        figure_to_display.init();
+        figure_to_display.addChild(sglLine(MIN_X, MIN_Y, MIN_Z, MAX_X, MIN_Y, MIN_Z, 0, 0, 0));
+        figure_to_display.addChild(sglLine(MIN_X, MIN_Y, MIN_Z, MIN_X, MAX_Y, MIN_Z, 0, 0, 0));
+        figure_to_display.addChild(sglLine(MIN_X, MIN_Y, MIN_Z, MIN_X, MIN_Y, MAX_Z, 0, 0, 0));
+        figure_to_display.addChild(sglLine(MAX_X, MIN_Y, MIN_Z, MAX_X, MIN_Y, MAX_Z, 0, 0, 0));
+        figure_to_display.addChild(sglLine(MAX_X, MIN_Y, MIN_Z, MAX_X, MAX_Y, MIN_Z, 0, 0, 0));
+        figure_to_display.addChild(sglLine(MIN_X, MIN_Y, MAX_Z, MAX_X, MIN_Y, MAX_Z, 0, 0, 0));
+        figure_to_display.addChild(sglLine(MIN_X, MIN_Y, MAX_Z, MIN_X, MAX_Y, MAX_Z, 0, 0, 0));
+        figure_to_display.addChild(sglLine(MIN_X, MAX_Y, MIN_Z, MIN_X, MAX_Y, MAX_Z, 0, 0, 0));
+        figure_to_display.addChild(sglLine(MIN_X, MAX_Y, MIN_Z, MAX_X, MAX_Y, MIN_Z, 0, 0, 0));
+        figure_to_display.addChild(sglLine(MAX_X, MIN_Y, MAX_Z, MAX_X, MAX_Y, MAX_Z, 0, 0, 0));
+        figure_to_display.addChild(sglLine(MAX_X, MAX_Y, MIN_Z, MAX_X, MAX_Y, MAX_Z, 0, 0, 0));
+        figure_to_display.addChild(sglLine(MIN_X, MAX_Y, MAX_Z, MAX_X, MAX_Y, MAX_Z, 0, 0, 0));
+        figure_to_display.addChild(sglLine(MIN_X, MIN_Y, MIN_Z, MAX_X * 10, MIN_Y, MIN_Z, 1, 0, 0));
+        figure_to_display.addChild(sglLine(MIN_X, MIN_Y, MIN_Z, MIN_X, MAX_Y * 10, MIN_Z, 0, 1, 0));
+        figure_to_display.addChild(sglLine(MIN_X, MIN_Y, MIN_Z, MIN_X, MIN_Y, MAX_Z * 10, 0, 0, 1));
         for (int o{0}; o < obstacleCorners.size(); o++)
         {
             cv::Point3d corner = obstacleCorners[o];
             cv::Point3d dims = obstacleDims[o];
             sglBox bx(corner.x, corner.y, corner.z, corner.x + dims.x, corner.y + dims.y, corner.z + dims.z, 0.5, 0.5, 0.5, 0.9);
-            my_fig.addChild(bx);
+            figure_to_display.addChild(bx);
         }
-        my_fig.flush();
-        _dosl_cout << "Press any key to start..." << _dosl_endl;
-        my_fig.get_key();
-#endif
+        figure_to_display.flush();
+        _dosl_cout << "Press any key to show start and goal" << _dosl_endl;
+        figure_to_display.get_key();
+        figure_to_display.addChild(sglSphere(startNode.x, startNode.y, startNode.z, 0.5, 1, 0, 0));
+        figure_to_display.addChild(sglSphere(goalNode.x, goalNode.y, goalNode.z, 0.5, 0, 1, 0));
+        figure_to_display.flush();
+        _dosl_cout << "Press any key to start the search" << _dosl_endl;
+        std::cout << "=============================================================" << std::endl;
+        figure_to_display.get_key();
         // Set planner variables
         all_nodes_set_p->reserve(ceil(MAX_X - MIN_X + 1));
     }
@@ -281,19 +317,17 @@ public:
     // -----------------------------------------------------------
 
     // in bounds check
-    bool isNodeInWorkspace(const myNode &tn)
+    bool isNodeInWorkspace(const myNode3D &tn)
     {
         if (tn.x < MIN_X || tn.x > MAX_X || tn.y < MIN_Y || tn.y > MAX_Y || tn.z < MIN_Z || tn.z > MAX_Z)
             return (false);
         return (true);
     }
 
-    double getOccVal(const myNode &p, bool debug_mode = false)
+    double getOccVal(const myNode3D &p)
     {
         if (!isNodeInWorkspace(p))
         {
-            if (debug_mode)
-                std::cout << "Not in workspace" << std::endl;
             return 1;
         }
         double occVal = 0;
@@ -368,16 +402,6 @@ public:
             // Inside 1
             if ((p.x > corner.x) && (p.x < corner.x + dims.x) && (p.y > corner.y) && (p.y < corner.y + dims.y) && (p.z > corner.z) && (p.z < corner.z + dims.z))
             {
-                if (debug_mode)
-                {
-                    std::cout << "p.x > corner.x: " << (p.x > corner.x) << std::endl;
-                    std::cout << "p.x < corner.x + dims.x: " << (p.x < corner.x + dims.x) << std::endl;
-                    std::cout << "p.y > corner.y: " << (p.y > corner.y) << std::endl;
-                    std::cout << "p.y < corner.y + dims.y: " << (p.y < corner.y + dims.y) << std::endl;
-                    std::cout << "p.z > corner.z: " << (p.z > corner.z) << std::endl;
-                    std::cout << "p.z < corner.z + dims.z: " << (p.z < corner.z + dims.z) << std::endl;
-                    std::cout << "Inside obstacle" << std::endl;
-                }
                 return 1;
             }
         }
@@ -448,344 +472,56 @@ public:
         // Left
         if ((p.x == 0) && (p.y > 0) && (p.y < MAX_Y) && (p.z > 0) && (p.z < MAX_Z))
             occVal += static_cast<double>(1) / 2;
-        if (debug_mode)
-            std::cout << "occVal: " << occVal << std::endl;
         return occVal;
     }
 
-    bool areCoordsFree(const myNode &p, bool debug_mode = false)
+    bool areCoordsFree(const myNode3D &p)
     {
-        return (getOccVal(p, debug_mode) != 1);
+        return (getOccVal(p) != 1);
     }
 
-    bool areCoordsFreeWithTolerance(const myNode &p)
+    bool areCoordsFreeWithTolerance(const myNode3D &p)
     {
         for (int i{-1}; i <= 1; i++)
             for (int j{-1}; j <= 1; j++)
                 for (int k{-1}; k <= 1; k++)
-                    if (areCoordsFree(myNode(p.x + i * EPS, p.y + j * EPS, p.z + k * EPS)))
+                    if (areCoordsFree(myNode3D(p.x + i * 0.001, p.y + j * 0.001, p.z + k * 0.001)))
                         return true;
         return false;
     }
 
-    bool isEdgeAccessibleNew(const myNode &tn1, const myNode &tn2, bool debug_mode = false)
+    bool isEdgeAccessible(const myNode3D &tn1, const myNode3D &tn2)
     {
         if ((!isNodeInWorkspace(tn1)) || !(isNodeInWorkspace(tn2)))
             return (false);
-        myNode mid_pt((tn1.x + tn2.x) / 2, (tn1.y + tn2.y) / 2, (tn1.z + tn2.z) / 2);
-        if (debug_mode)
-        {
-            tn1.print("tn1: ");
-            mid_pt.print("mid pt: ");
-            tn2.print("tn2: ");
-            std::cout << "tn1 free: " << areCoordsFree(tn1, true) << std::endl;
-            std::cout << "mid free: " << areCoordsFree(mid_pt, true) << std::endl;
-            std::cout << "tn2 free: " << areCoordsFree(tn2, true) << std::endl;
-            std::cout << "tn1 free with tol: " << areCoordsFreeWithTolerance(tn1) << std::endl;
-            std::cout << "mid free with tol: " << areCoordsFreeWithTolerance(mid_pt) << std::endl;
-            std::cout << "tn2 free with tol: " << areCoordsFreeWithTolerance(tn2) << std::endl;
-        }
+        myNode3D mid_pt((tn1.x + tn2.x) / 2, (tn1.y + tn2.y) / 2, (tn1.z + tn2.z) / 2);
         // return (areCoordsFree(tn1) && areCoordsFree(tn2) && areCoordsFree(mid_pt));
         return (areCoordsFreeWithTolerance(tn1) && areCoordsFreeWithTolerance(tn2) && areCoordsFreeWithTolerance(mid_pt));
     }
 
-    bool isEdgeAccessibleAlternative(const myNode &tn1, const myNode &tn2)
-    {
-        if ((!isNodeInWorkspace(tn1)) || !(isNodeInWorkspace(tn2)))
-            return (false);
-
-        if (tn1.x == tn2.x)
-        {
-            if (tn1.y != tn2.y && tn1.z != tn2.z)
-            { // diagonal edge
-                if (!occupancyMap.at<int>(tn1.x, round(MIN(tn1.y, tn2.y)), round(MIN(tn1.z, tn2.z))))
-                    return true;
-                else
-                {
-                    if (tn1.x == MIN_X)
-                        return false;
-                    else if (!occupancyMap.at<int>(tn1.x - 1, round(MIN(tn1.y, tn2.y)), round(MIN(tn1.z, tn2.z))))
-                        return true;
-                    else
-                        return false;
-                }
-            }
-            else if (tn1.y == tn2.y)
-            {
-                if (!occupancyMap.at<int>(tn1.x, tn1.y, round(MIN(tn1.z, tn2.z))))
-                    return true;
-                else
-                {
-                    if (tn1.x == MIN_X && tn1.y == MIN_Y)
-                        return false;
-                    else if (tn1.x == MIN_X)
-                    {
-                        if (!occupancyMap.at<int>(tn1.x, tn1.y - 1, round(MIN(tn1.z, tn2.z))))
-                            return true;
-                        else
-                            return false;
-                    }
-                    else if (tn1.y == MIN_Y)
-                    {
-                        if (!occupancyMap.at<int>(tn1.x - 1, tn1.y, round(MIN(tn1.z, tn2.z))))
-                            return true;
-                        else
-                            return false;
-                    }
-                    else
-                    {
-                        if (!occupancyMap.at<int>(tn1.x - 1, tn1.y - 1, round(MIN(tn1.z, tn2.z))))
-                            return true;
-                        else
-                            return false;
-                    }
-                }
-            }
-            else if (tn1.z == tn2.z)
-            {
-                if (!occupancyMap.at<int>(tn1.x, round(MIN(tn1.y, tn2.y)), tn1.z))
-                    return true;
-                else
-                {
-                    if (tn1.x == MIN_X && tn1.z == MIN_Z)
-                        return false;
-                    else if (tn1.x == MIN_X)
-                    {
-                        if (!occupancyMap.at<int>(tn1.x, round(MIN(tn1.y, tn2.y)), tn1.z - 1))
-                            return true;
-                        else
-                            return false;
-                    }
-                    else if (tn1.z == MIN_Z)
-                    {
-                        if (!occupancyMap.at<int>(tn1.x - 1, round(MIN(tn1.y, tn2.y)), tn1.z))
-                            return true;
-                        else
-                            return false;
-                    }
-                    else
-                    {
-                        if (!occupancyMap.at<int>(tn1.x - 1, round(MIN(tn1.y, tn2.y)), tn1.z - 1))
-                            return true;
-                        else
-                            return false;
-                    }
-                }
-            }
-        }
-        else if (tn1.y == tn2.y)
-        {
-            if (tn1.x != tn2.x && tn1.z != tn2.z)
-            { // diagonal edge
-                if (!occupancyMap.at<int>(round(MIN(tn1.x, tn2.x)), tn1.y, round(MIN(tn1.z, tn2.z))))
-                    return true;
-                else
-                {
-                    if (tn1.y == MIN_Y)
-                        return false;
-                    else if (!occupancyMap.at<int>(round(MIN(tn1.x, tn2.x)), tn1.y - 1, round(MIN(tn1.z, tn2.z))))
-                        return true;
-                    else
-                        return false;
-                }
-            }
-            else if (tn1.x == tn2.x)
-            {
-                if (!occupancyMap.at<int>(tn1.x, tn1.y, round(MIN(tn1.z, tn2.z))))
-                    return true;
-                else
-                {
-                    if (tn1.x == MIN_X && tn1.y == MIN_Y)
-                        return false;
-                    else if (tn1.x == MIN_X)
-                    {
-                        if (!occupancyMap.at<int>(tn1.x, tn1.y - 1, round(MIN(tn1.z, tn2.z))))
-                            return true;
-                        else
-                            return false;
-                    }
-                    else if (tn1.y == MIN_Y)
-                    {
-                        if (!occupancyMap.at<int>(tn1.x - 1, tn1.y, round(MIN(tn1.z, tn2.z))))
-                            return true;
-                        else
-                            return false;
-                    }
-                    else
-                    {
-                        if (!occupancyMap.at<int>(tn1.x - 1, tn1.y - 1, round(MIN(tn1.z, tn2.z))))
-                            return true;
-                        else
-                            return false;
-                    }
-                }
-            }
-            else if (tn1.z == tn2.z)
-            {
-                if (!occupancyMap.at<int>(round(MIN(tn1.x, tn2.x)), tn1.y, tn1.z))
-                    return true;
-                else
-                {
-                    if (tn1.y == MIN_Y && tn1.z == MIN_Z)
-                        return false;
-                    else if (tn1.y == MIN_Y)
-                    {
-                        if (!occupancyMap.at<int>(round(MIN(tn1.x, tn2.x)), tn1.y, tn1.z - 1))
-                            return true;
-                        else
-                            return false;
-                    }
-                    else if (tn1.z == MIN_Z)
-                    {
-                        if (!occupancyMap.at<int>(round(MIN(tn1.x, tn2.x)), tn1.y - 1, tn1.z))
-                            return true;
-                        else
-                            return false;
-                    }
-                    else
-                    {
-                        if (!occupancyMap.at<int>(round(MIN(tn1.x, tn2.x)), tn1.y - 1, tn1.z - 1))
-                            return true;
-                        else
-                            return false;
-                    }
-                }
-            }
-        }
-        else if (tn1.z == tn2.z)
-        {
-            if (tn1.x != tn2.x && tn1.y != tn2.y)
-            { // diagonal edge
-                if (!occupancyMap.at<int>(round(MIN(tn1.x, tn2.x)), round(MIN(tn1.y, tn2.y)), tn1.z))
-                    return true;
-                else
-                {
-                    if (tn1.z == MIN_Z)
-                        return false;
-                    else if (!occupancyMap.at<int>(round(MIN(tn1.x, tn2.x)), round(MIN(tn1.y, tn2.y)), tn1.z - 1))
-                        return true;
-                    else
-                        return false;
-                }
-            }
-            else if (tn1.x == tn2.x)
-            {
-                if (!occupancyMap.at<int>(tn1.x, round(MIN(tn1.y, tn2.y)), tn1.z))
-                    return true;
-                else
-                {
-                    if (tn1.x == MIN_X && tn1.z == MIN_Z)
-                        return false;
-                    else if (tn1.x == MIN_X)
-                    {
-                        if (!occupancyMap.at<int>(tn1.x, round(MIN(tn1.y, tn2.y)), tn1.z - 1))
-                            return true;
-                        else
-                            return false;
-                    }
-                    else if (tn1.z == MIN_Z)
-                    {
-                        if (!occupancyMap.at<int>(tn1.x - 1, round(MIN(tn1.y, tn2.y)), tn1.z))
-                            return true;
-                        else
-                            return false;
-                    }
-                    else
-                    {
-                        if (!occupancyMap.at<int>(tn1.x - 1, round(MIN(tn1.y, tn2.y)), tn1.z - 1))
-                            return true;
-                        else
-                            return false;
-                    }
-                }
-            }
-            else if (tn1.y == tn2.y)
-            {
-                if (!occupancyMap.at<int>(round(MIN(tn1.x, tn2.x)), tn1.y, tn1.z))
-                    return true;
-                else
-                {
-                    if (tn1.y == MIN_Y && tn1.z == MIN_Z)
-                        return false;
-                    else if (tn1.y == MIN_Y)
-                    {
-                        if (!occupancyMap.at<int>(round(MIN(tn1.x, tn2.x)), tn1.y, tn1.z - 1))
-                            return true;
-                        else
-                            return false;
-                    }
-                    else if (tn1.z == MIN_Z)
-                    {
-                        if (!occupancyMap.at<int>(round(MIN(tn1.x, tn2.x)), tn1.y - 1, tn1.z))
-                            return true;
-                        else
-                            return false;
-                    }
-                    else
-                    {
-                        if (!occupancyMap.at<int>(round(MIN(tn1.x, tn2.x)), tn1.y - 1, tn1.z - 1))
-                            return true;
-                        else
-                            return false;
-                    }
-                }
-            }
-        }
-        else
-        {
-            return (!occupancyMap.at<int>(round(MIN(tn1.x, tn2.x)), round(MIN(tn1.y, tn2.y)), round(MIN(tn1.z, tn2.z))));
-        }
-
-        return (true);
-    }
-
     // -----------------------------------------------------------
 
-    // void getSuccessors(myNode &n, std::vector<myNode> *s, std::vector<double> *c, myNode *grandparent) // *** This must be defined
-    void getSuccessors(myNode &n, std::vector<myNode> *s, std::vector<double> *c) // *** This must be defined
+    void getSuccessors(myNode3D &n, std::vector<myNode3D> *s, std::vector<double> *c) // *** This must be defined
     {
 
-        // Update lineage data (via copy from parent), garbage otherwise
-        n.lineage_data = n.parent->lineage_data;
-
-        myNode tn; // dummy node instance
+        myNode3D tn; // dummy node instance
         tn.genNo = n.genNo + 1;
-
-        // *AS: See if this one breaks
-        // if (n.isMergePoint)
-        // {
-        //     // n.print("Alternative getSuccessors for mergePoint: ");
-        //     for (auto it = n.parent_list.begin(); it != n.parent_list.end(); ++it)
-        //     {
-        //         s->push_back(*(it->first));
-        //         c->push_back(it->second);
-        //     }
-        //     return;
-        // }
-
-        // Regular successor generation
 
         tn.parent = &n; // assign parent pointer
         // loop through in all directions
 
         for (int a = 0; a < 14; ++a)
         {
-            tn.x = n.x + edges[a][0] * R_EDGE_LENGTH;
-            tn.y = n.y + edges[a][1] * R_EDGE_LENGTH;
-            tn.z = n.z + edges[a][2] * R_EDGE_LENGTH;
+            tn.x = n.x + edges[a][0];
+            tn.y = n.y + edges[a][1];
+            tn.z = n.z + edges[a][2];
 
             // if (!isEdgeAccessible(tn, n))
-            if (!isEdgeAccessibleNew(tn, n))
+            if (!isEdgeAccessible(tn, n))
                 continue;
 
             double dx = tn.x - n.x, dy = tn.y - n.y, dz = tn.z - n.z;
             double computed_cost = sqrt(dx * dx + dy * dy + dz * dz);
-            tn.transition_cost = computed_cost;
-
-            // Clear previous parents
-            tn.parent_list.clear();
-            // Insert new parent
-            tn.parent_list.insert(std::make_pair(tn.parent, tn.transition_cost));
 
             s->push_back(tn);
             c->push_back(computed_cost);
@@ -794,7 +530,7 @@ public:
 
     // -----------------------------------------------------------
 
-    double getHeuristics(myNode &n)
+    double getHeuristics(myNode3D &n)
     {
         // With euclidean heuristic
 
@@ -808,25 +544,17 @@ public:
 
     // -----------------------------------------------------------
 
-    std::vector<myNode> getStartNodes(void)
+    std::vector<myNode3D> getStartNodes(void)
     {
-        std::vector<myNode> startNodes;
+        std::vector<myNode3D> startNodes;
         startNodes.push_back(startNode);
-#if VIS
-        my_fig.addChild(sglSphere(startNode.x, startNode.y, startNode.z, 0.5, 1, 0, 0));
-        // my_fig.addChild(sglSphere(4, 4, 16, 0.3, 0.2, 0.2, 0.2));
-        my_fig.addChild(sglSphere(goalNode.x, goalNode.y, goalNode.z, 0.5, 0, 1, 0));
-        my_fig.flush();
-        my_fig.get_key();
-#endif
         return (startNodes);
     }
 
     // -----------------------------------------------------------
 
-    void nodeEvent(myNode &n, unsigned int e)
+    void nodeEvent(myNode3D &n, unsigned int e)
     {
-        bool drawVertex = false;
         std::vector<double> col{0, 0, 0};
         double alpha = 0.7;
 
@@ -840,18 +568,14 @@ public:
 #endif
             if (!cameFromNull)
             {
-                std::vector<myNode *> nodes_at_same_xy = all_nodes_set_p->getall(n, compare_by_coord_only);
+                std::vector<myNode3D *> nodes_at_same_xy = all_nodes_set_p->getall(n, compare_by_coord_only);
                 double rb_intensity = MAX(0.0, 1.0 - 0.2 * nodes_at_same_xy.size());
                 col = {rb_intensity, 1.0, rb_intensity};
-#if VIS
-                if (n.isMergePoint)
-                    displayBoxes.at(n.x).at(n.y).at(n.z)->color() = sglMake3vec(1, 0.64706, 0);
+                if (n.isCutPoint)
+                    plotCutPoint(n);
                 else
-                    displayBoxes.at(n.x).at(n.y).at(n.z)->color() = sglMake3vec(rb_intensity, 1.0, rb_intensity);
-
-                displayBoxes.at(n.x).at(n.y).at(n.z)->visible() = true;
-#endif
-                if (expand_count % 1000 == 0)
+                    plotNode(n, col);
+                if (expand_count % REPORT_INTERVAL == 0)
                 {
                     current_time = std::chrono::steady_clock::now();
                     std::cout << "Expanded " << expand_count << " vertices. Time since start: " << std::chrono::duration_cast<std::chrono::seconds>(current_time - start_time).count() << "s" << std::endl;
@@ -866,38 +590,21 @@ public:
             {
                 n.parent = &n;
             }
-#if VIS
-            displayBoxes.at(n.x).at(n.y).at(n.z)->color() = sglMake3vec(0, 0, 1);
-            displayBoxes.at(n.x).at(n.y).at(n.z)->visible() = true;
-#endif
-        }
-
-        else if (e & UNEXPANDED)
-        {
-            // printf("Backtrack started!!\n");
+            plotNode(n, col);
         }
         else if (e & UPDATED)
         {
             n.parent = n.oneStepRollback();
-            n.getNeighborhood(R_NEIGHBORHOOD_RADIUS, R_MIN_NB_GENERATIONS);
-// n.getNeighborhood(n.NEIGHBORHOOD_RADIUS);
-#if VIS
-            displayBoxes.at(n.x).at(n.y).at(n.z)->color() = sglMake3vec(0.5, 0.5, 0.5);
-            displayBoxes.at(n.x).at(n.y).at(n.z)->visible() = true;
-#endif
+            n.getNeighborhood(R_NEIGHBORHOOD_RADIUS, R_NEIGHBORHOOD_SEARCH_DEPTH);
+            // n.getNeighborhood(n.NEIGHBORHOOD_RADIUS);
+            plotNode(n, {0.5, 0.5, 0.5});
         }
         else if (e & ERROR)
         {
             _dosl_cout << "\033[1;34;47m================================ nodeEvent (ERROR) start =================================\033[0m\n"
                        << _dosl_endl;
-            n.print("isMergePoint=" + std::to_string(n.isMergePoint) + ", Error at this node: "); // nodeEvent with ERROR tag is called on this node
-            n.printSuccessors();
-#if VIS
-            my_fig.flush();
-            my_fig.get_key();
-#endif
-            clr = false;
-
+            figure_to_display.flush();
+            figure_to_display.get_key();
             current_time = std::chrono::steady_clock::now();
         }
 
@@ -905,47 +612,24 @@ public:
             return;
 
         //-------------------------------------------
-        if (drawVertex)
-        {
-#if VIS
-            my_fig.addChild(sglBox(n.x, n.y, n.z, n.x + 1, n.y + 1, n.z + 0.2, col[0], col[1], col[2], alpha));
-#endif
-        }
-
-        if (expand_count % VIS_INTERVAL == 0 || node_heap_p->size() == 0)
-        {
-#if VIS
-            my_fig.flush();
-            sleep(0.5);
-#endif
-        }
+        // figure_to_display.addChild(sglBox(n.x, n.y, n.z, n.x + 1, n.y + 1, n.z + 0.2, col[0], col[1], col[2], alpha));
     }
 
     // ---------------------------------------
 
-    bool stopSearch(myNode &n)
+    bool stopSearch(myNode3D &n)
     { // Stop conditions
         if (n.isCoordsEqual(goalNode))
         {
-// for (auto &g : homotopyGoals)
-// {
-//     if (n.hasCommonPredecessors(g))
-//         return false;
-// }
-#if VIS
-            my_fig.addChild(sglSphere(goalNode.x, goalNode.y, goalNode.z, 0.5, 0, 1, 0));
-#endif
-            homotopyGoals.push_back(n);
-            ++nClasses;
+            foundGoals.push_back(n);
+            ++nPathsFound;
             n.print("Found a path to ");
             current_time = std::chrono::steady_clock::now();
-            std::cout << "Found path #" << nClasses << ". Expanded " << expand_count << " vertices. Time since start: " << std::chrono::duration_cast<std::chrono::seconds>(current_time - start_time).count() << "s" << std::endl;
-            if (nClasses >= nClassesToFind)
+            std::cout << "Found path " << nPathsFound << "/" << nPathsToFind << ". Expanded " << expand_count << " vertices. Time since start: " << std::chrono::duration_cast<std::chrono::seconds>(current_time - start_time).count() << "s" << std::endl;
+            if (nPathsFound >= nPathsToFind)
             {
-#if VIS
-                my_fig.flush();
-                my_fig.get_key();
-#endif
+                figure_to_display.flush();
+                figure_to_display.get_key();
                 return (true);
             }
         }

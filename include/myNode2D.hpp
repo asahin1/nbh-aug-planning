@@ -5,7 +5,7 @@
 #define _MYNODE2D_H
 
 // Standard libraries
-#include <unordered_set>
+// #include <unordered_set>
 
 // DOSL macros
 #define _DOSL_CHECK_GRAPH_DIRECTIONALITY 2 // set 2 for auto-fix
@@ -26,29 +26,22 @@ class myNode2D : public _DOSL_ALGORITHM::Node<myNode2D, double>
 {
 public:
     // Attributes
-    COORD_TYPE x, y;                                    // coordinates
-    myNode2D *parent = nullptr;                         // pointer to parent (at generation time)
-    double transition_cost = 0;                         // transition cost from parent to this node
-    myNode2D *furthest_grandparent = nullptr;           // pointer to furthest grandparent (updated during predecessor rollback)
-    std::unordered_set<myNode2D *> neighborhood;        // set of predecessors (generated during comparison)
-    bool isCutPoint = false;                            // merge point flag
-    std::unordered_map<myNode2D *, double> parent_list; // set of (parent,transition cost) pairs
+    COORD_TYPE x, y;                             // coordinates
+    myNode2D *parent = nullptr;                  // pointer to parent (at generation time)
+    myNode2D *neighborhoodCenterNode = nullptr;  // pointer to furthest grandparent (updated during predecessor rollback)
+    std::unordered_set<myNode2D *> neighborhood; // set of predecessors (generated during comparison)
+    bool isCutPoint = false;                     // merge point flag
     int genNo{0};
-
-    // Plot methods
-    void plotNode(CvScalar col = cvScalar(0, 0, 0)); // plot a single node with desired color
-    void plotCutPoint();                             // plot as merge point (with orange, show image immediately)
 
     // Updates and checks
     myNode2D *oneStepRollback();
     void findNeighborhoodCenter();
-    void getNeighborhood(double nbRadius, int minGenerations);
+    void getNeighborhood(double nbRadius, int minSearchDepth);
     void cutPointCheck(myNode2D &n);
     void generateCutPointRegion();
 
     bool isCoordsEqual(const myNode2D &n) const;   // coordinate comparison
     bool hasNeighborhoodIntersection(myNode2D &n); // predecessor comparison
-    void mergeNodeElements(myNode2D &n);           // merging sets, maps, lists
 
     double getDistance(const myNode2D &n) const;
 

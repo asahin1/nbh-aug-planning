@@ -36,7 +36,7 @@ void myNode2D::findNeighborhoodCenter()
     {
         recursive_ptr = recursive_ptr->oneStepRollback();
     }
-    furthest_grandparent = recursive_ptr;
+    neighborhoodCenterNode = recursive_ptr;
 }
 
 bool myNode2D::isCoordsEqual(const myNode2D &n) const
@@ -85,11 +85,6 @@ bool myNode2D::hasNeighborhoodIntersection(myNode2D &n)
     return false;
 }
 
-void myNode2D::mergeNodeElements(myNode2D &n)
-{
-    mergeUnordered(this->parent_list, n.parent_list); // merge parent lists
-}
-
 double myNode2D::getDistance(const myNode2D &n) const
 {
     double dx = x - n.x;
@@ -103,28 +98,17 @@ bool myNode2D::operator==(myNode2D &n)
     if (!isCoordsEqual(n)) // corrdinate based comparison (this is necessary)
         return (false);
 
-#ifdef DOSL_ALGORITHM_SStar
-    // if (y = 50 && x > 50)
-    if (genNo >= R_LINEAGE_DATA_GENERATION_THRESHOLD && n.genNo >= R_LINEAGE_DATA_GENERATION_THRESHOLD)
-    // if (lineage_data.generation > R_LINEAGE_DATA_GENERATION_THRESHOLD || n.lineage_data.generation > R_LINEAGE_DATA_GENERATION_THRESHOLD)
-    { // *SB: don't do this near the start
-#endif
-
-        if (isCutPoint || n.isCutPoint)
-        {
-            mergeNodeElements(n); // if true, merge elements
-            genNo = std::min(genNo, n.genNo);
-            return true;
-        }
-
-        if (!hasNeighborhoodIntersection(n))
-        {
-            return (false);
-        }
-        mergeNodeElements(n); // if true, merge elements
-#ifdef DOSL_ALGORITHM_SStar
+    if (isCutPoint || n.isCutPoint)
+    {
+        genNo = std::min(genNo, n.genNo);
+        return true;
     }
-#endif
+
+    if (!hasNeighborhoodIntersection(n))
+    {
+        return (false);
+    }
+
     genNo = std::min(genNo, n.genNo);
     return (true);
 }

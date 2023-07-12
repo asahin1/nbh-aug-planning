@@ -2,23 +2,15 @@
 #include "dosl/planners/SStar_original.tcc"
 #include "dosl/planners/ThetaStar_original.tcc"
 
-// OpenCV
-#include <opencv2/opencv.hpp>
-#include <opencv2/highgui.hpp>
-
 #include <dosl/aux-utils/cvParseMap2d.hpp>
 
 #define SEARCH2_ALG AStar_original
-
-// #define HEURISTIC_WEIGHT 0.8
 
 template <class nodeType>
 class cutPointSearchNode : public SEARCH2_ALG::Node<cutPointSearchNode<nodeType>, double>
 {
 public:
-    nodeType *np; // required member of nodeType: unordered_map<nodeType*,double> successors;
-    // bool came_from_pinch_point; // *SB: allow neighborhood search to propagate through pinch points, but mark them.
-    // bool isCutPoint = false;
+    nodeType *np;
     int generation_no{0};
     cutPointSearchNode() {}
     cutPointSearchNode(nodeType *p) : np(p) {}
@@ -51,31 +43,30 @@ public:
     typedef cutPointSearchNode<nodeType> CPSN;
     CPSN start;
     CPSN goal;
-    int min_generations;
-    double outerRadius;
+    // int minSearchDepth;
+    double maxSearchRadius;
     CPSN primary_search_start;
     bool reachedGoal{false};
     double pathLength{-1};
-    cvParseMap2d my_map;
-    cv::Mat occupancyMap;
-    // Alternatively
-    std::unordered_set<nodeType *> neighborhood;
-    cutPointSearchProblem(nodeType *p, double o_r, int mg, nodeType *g, nodeType *s, cv::Mat primary_search_display)
-        : outerRadius(o_r), min_generations(mg)
+    cvParseMap2d env2D;
+    cv::Mat env3D;
+
+    cutPointSearchProblem(nodeType *p, double o_r, nodeType *g, nodeType *s)
+        : maxSearchRadius(o_r)
     {
         start = CPSN(p);
         goal = CPSN(g);
         primary_search_start = CPSN(s);
     }
-    cutPointSearchProblem(nodeType *p, double o_r, int mg, nodeType *g, nodeType *s, cv::Mat primary_search_display, cvParseMap2d search_map)
-        : outerRadius(o_r), min_generations(mg), my_map(search_map)
+    cutPointSearchProblem(nodeType *p, double o_r, nodeType *g, nodeType *s, cvParseMap2d search_map_2D)
+        : maxSearchRadius(o_r), env2D(search_map_2D)
     {
         start = CPSN(p);
         goal = CPSN(g);
         primary_search_start = CPSN(s);
     }
-    cutPointSearchProblem(nodeType *p, double o_r, int mg, nodeType *g, nodeType *s, cv::Mat primary_search_display, cv::Mat occupancy_map)
-        : outerRadius(o_r), min_generations(mg), occupancyMap(occupancy_map)
+    cutPointSearchProblem(nodeType *p, double o_r, nodeType *g, nodeType *s, cv::Mat search_map_3D)
+        : maxSearchRadius(o_r), env3D(search_map_3D)
     {
         start = CPSN(p);
         goal = CPSN(g);
@@ -119,7 +110,7 @@ public:
             xx = n1.np->x + a * xstep;
             yy = n1.np->y + a * ystep;
             zz = n1.np->z + a * zstep;
-            if (occupancyMap.at<int>((int)round(xx), (int)round(yy), (int)round(zz)))
+            if (env3D.at<int>((int)round(xx), (int)round(yy), (int)round(zz)))
                 return (false);
         }
         return (true);
@@ -135,7 +126,7 @@ public:
         {
             xx = n1.np->x + a * xstep;
             yy = n1.np->y + a * ystep;
-            if (my_map.isObstacle((int)round(xx), (int)round(yy)))
+            if (env2D.isObstacle((int)round(xx), (int)round(yy)))
                 return (false);
         }
         return (true);
@@ -177,23 +168,11 @@ public:
             pathLength = n.g_score;
             return true;
         }
-        if (n.g_score > outerRadius)
+        if (n.g_score > maxSearchRadius)
         {
             reachedGoal = false;
             return true;
         }
         return false;
-    }
-
-    std::vector<nodeType *> getPath()
-    {
-        std::vector<nodeType *> path;
-        if (reachedGoal)
-        {
-            auto MPS_path = this->reconstruct_pointer_path(goal);
-            for (auto i : MPS_path)
-                path.push_back(i->np);
-        }
-        return path;
     }
 };

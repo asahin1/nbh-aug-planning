@@ -20,9 +20,7 @@
         HEURISTIC_WEIGHT: 0.6,
         ROLLBACK_RADIUS: 3,
         NEIGHBORHOOD_RADIUS : 8,
-        NEIGHBORHOOD_SEARCH_DEPTH: 8, 
-        // LINEAGE_DATA_GENERATION_THRESHOLD :10,
-        // NEIGHBORHOOD_SIZE_THRESHOLD: 10,
+        NEIGHBORHOOD_SEARCH_DEPTH: 8,
         CUT_POINT_CHECK: 1,
         CP_LOWER_THRESHOLD: 8,
         CP_UPPER_THRESHOLD: 25,
@@ -30,7 +28,7 @@
         CP_PATH_PORTION: 0.2,
         CP_GSCORE_DIFF: 0.1,
         CPR_RADIUS: 3
-    }
+    },
 
     // 3D with cut points
     '3d_with_cut':{

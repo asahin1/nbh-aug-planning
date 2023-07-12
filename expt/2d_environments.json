@@ -23,8 +23,7 @@
     'map_nonuniform_with_obstacles':                                        
     {  environment: { pixmap: "map_nu_obst_obstacles.png",
                       cost_type: "nonuniform",
-                      cost_multiplier: 4.0},      
-        gene_threshold: 50,                         
+                      cost_multiplier: 4.0},                         
         start:     [35 , 75],                       
         goal:      [170, 75],   
         plot_options: { plot_scale: 5.0,
@@ -36,7 +35,7 @@
     'map_single_high_cost':
     {  environment: { pixmap: "map_single_high_cost_obstacles.png",
                       cost_type: "nonuniform",
-                      cost_multiplier: 4.0 },
+                      cost_multiplier: 0.5 },
         start:     [15, 50],
         // goal:      [90, 10],
         goal:      [90, 50],
