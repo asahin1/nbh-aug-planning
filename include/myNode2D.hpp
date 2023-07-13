@@ -37,6 +37,7 @@ public:
 
     bool isCoordsEqual(const myNode2D &n) const;   // coordinate comparison
     bool hasNeighborhoodIntersection(myNode2D &n); // neighborhood comparison
+
     // This must be defined for the node
     bool operator==(myNode2D &n); // comparison
 

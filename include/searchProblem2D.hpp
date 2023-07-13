@@ -9,7 +9,7 @@
 #include "RSJparser.tcc"
 
 // Planning related
-#include "myNode2D.hpp" // myNode class based on DOSL
+#include "myNode2D.hpp"
 
 // Global variables (algorithm parameters)
 double R_HEURISTIC_WEIGHT;
@@ -208,7 +208,7 @@ public:
 
         // plot options
         PLOT_SCALE = expt_container["plot_options"]["plot_scale"].as<double>(1.0);
-        LINE_THICKNESS = expt_container["plot_options"]["line_thickness"].as<double>(2.0); // CV_FILLED
+        LINE_THICKNESS = expt_container["plot_options"]["line_thickness"].as<double>(2.0);
 
         // algorithm parameters
         R_HEURISTIC_WEIGHT = param_container["HEURISTIC_WEIGHT"].as<double>(1.0);
@@ -452,9 +452,7 @@ public:
         {
             col = cvScalar(255.0, 0.0, 0.0); // blue
             if (n.genNo == 0)
-            {
                 n.parent = &n; // reassign startNode parent (correct pointer this time)
-            }
         }
 
         else if (e & UNEXPANDED)

@@ -91,7 +91,7 @@ double myNode2D::getDistance(const myNode2D &n) const
 
 bool myNode2D::operator==(myNode2D &n)
 {
-    if (!isCoordsEqual(n)) // corrdinate based comparison (this is necessary)
+    if (!isCoordsEqual(n))
         return (false);
 
     if (isCutPoint || n.isCutPoint)

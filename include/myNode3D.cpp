@@ -2,16 +2,14 @@
 
 myNode3D *myNode3D::oneStepRollback()
 {
-    // This is an attempt (for SStar, for AStar it is supposed to work as intended)
-    // to rollback one step
 #ifdef DOSL_ALGORITHM_SStar
     myNode3D *cfv{nullptr};
+    // Follow through the node with highest weight in the simplex
     if (CameFromSimplex != NULL)
     {
         double maxWeight{-1};
         for (auto &s : CameFromSimplex->p)
         {
-            // if (CameFromSimplex->w[s] > maxWeight && !s->isMergePoint) // this causes segmentation faults (occasionally)
             if (CameFromSimplex->w[s] > maxWeight)
             {
                 maxWeight = CameFromSimplex->w[s];
@@ -22,6 +20,7 @@ myNode3D *myNode3D::oneStepRollback()
     if (cfv)
         return cfv;
 #else
+    // Follow through came from nodes
     if (came_from)
         return came_from;
 #endif
@@ -40,45 +39,41 @@ void myNode3D::findNeighborhoodCenter()
 }
 
 bool myNode3D::isCoordsEqual(const myNode3D &n) const
-{ // Coordinate based comparison
+{
     return ((x == n.x) && (y == n.y) && (z == n.z));
 }
 
 bool myNode3D::hasNeighborhoodIntersection(myNode3D &n)
 {
-    // Collect predecessors
+    // Generate neighborhood (if not generated before)
     if (neighborhood.empty())
         getNeighborhood(R_NEIGHBORHOOD_RADIUS, R_NEIGHBORHOOD_SEARCH_DEPTH);
     if (n.neighborhood.empty())
         n.getNeighborhood(R_NEIGHBORHOOD_RADIUS, R_NEIGHBORHOOD_SEARCH_DEPTH);
-    // Check for overlap
+
+    // Check for intersection
     int commonNeighbors = 0;
-    // std::unordered_set<myNode3D *> commonNodes;
     for (auto &i : neighborhood)
     {
         if (i->isCutPoint)
             continue;
         if (n.neighborhood.count(i) != 0)
-        {
-            // i->print("i: ");
             commonNeighbors++;
-            // commonNodes.insert(i);
-        }
     }
-    // std::cout << "common neighbors: " << commonNeighbors << std::endl;
+
     int overlapDenominator = std::max(neighborhood.size(), n.neighborhood.size());
     double neighborhoodOverlap = static_cast<double>(commonNeighbors) * 100 / overlapDenominator;
 
     if (neighborhoodOverlap > 0)
     {
-        if (isCutPoint)
+        if (R_CUT_POINT_CHECK)
         {
-            n.isCutPoint = true;
-            return true;
-        }
-        if (neighborhoodOverlap < R_OVERLAP_FOR_CP)
-        {
-            if (R_CUT_POINT_CHECK)
+            if (isCutPoint)
+            {
+                n.isCutPoint = true; // Nodes were going to be identified as the same anyway, no need to check again
+                return true;
+            }
+            if (neighborhoodOverlap < R_OVERLAP_FOR_CP)
                 cutPointCheck(n);
         }
         return true;
@@ -98,7 +93,7 @@ double myNode3D::getDistance(const myNode3D &n) const
 // Comparison
 bool myNode3D::operator==(myNode3D &n)
 {
-    if (!isCoordsEqual(n)) // corrdinate based comparison (this is necessary)
+    if (!isCoordsEqual(n))
         return (false);
 
     if (isCutPoint || n.isCutPoint)
@@ -108,24 +103,21 @@ bool myNode3D::operator==(myNode3D &n)
     }
 
     if (!hasNeighborhoodIntersection(n))
-    {
         return (false);
-    }
+
     genNo = std::min(genNo, n.genNo);
     return (true);
 }
 
-// Constructors
 myNode3D::myNode3D(COORD_TYPE xx, COORD_TYPE yy, COORD_TYPE zz) : x(xx), y(yy), z(zz) {}
 
-// Inherited functions being overwritten
 int myNode3D::getHashBin(void) const
 {
-    return (100 * abs(x) + abs(y) + 10 * abs(z)); // SB: better hash function
+    return (100 * abs(x) + abs(y) + 10 * abs(z));
 }
 
 void myNode3D::print(std::string head, std::string tail) const
-{ // Print this node
+{
     _dosl_cout << std::setw(2) << std::right << head
                << std::setw(4) << std::right << "[x=" << x
                << ", y=" << y << ", z=" << z << "]"

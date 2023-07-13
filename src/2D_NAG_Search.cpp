@@ -6,7 +6,7 @@
 #include <dosl/aux-utils/string_utils.hpp> // compute_program_path
 
 // Planning related
-#include "include/searchProblem2D.hpp" // searchProblem class based on DOSL
+#include "include/searchProblem2D.hpp"
 
 searchProblem2D *search2D_ptr{nullptr}; // A searchProblem2D pointer(NULL for now), required for method implementations
 

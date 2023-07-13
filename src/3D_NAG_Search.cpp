@@ -1,23 +1,24 @@
-// Main .cpp file for performing the search and plotting results
-// Also includes some function implementations
+// Main file for running search on 3D graph
+// Also includes some method implementations for myNode3D class (these need the pointer to the primary search instance)
+
 // =============================================================
-// #include <chrono>
+// dosl utils
 #include <dosl/aux-utils/string_utils.hpp> // compute_program_path
-#include "include/searchProblem3D.hpp"     // searchProblem class based on DOSL
-// =========================================================================================================================================================
-searchProblem3D *search3D_ptr{nullptr};
+
+// Planning related
+#include "include/searchProblem3D.hpp"
+
+searchProblem3D *search3D_ptr{nullptr}; // A searchProblem3D pointer(NULL for now), required for method implementations
+
 #define bool bool
-// ==============================================================================
 
 void myNode3D::getNeighborhood(double nbRadius, int minSearchDepth)
 {
     findNeighborhoodCenter();
-    // SB: creating neighborhood centered on the furthest grandparent (then assign it to predecessors)
-    neighborhoodSearchProblem<myNode3D> neighborhood_search(neighborhoodCenterNode, nbRadius, R_HEURISTIC_WEIGHT, minSearchDepth, &search3D_ptr->startNode, search3D_ptr->occupancyMap);
+    neighborhoodSearchProblem<myNode3D> neighborhood_search(neighborhoodCenterNode, nbRadius, R_HEURISTIC_WEIGHT,
+                                                            minSearchDepth, &search3D_ptr->startNode, search3D_ptr->occupancyMap);
     neighborhood_search.search();
-
     neighborhood = neighborhood_search.collectNeighborhood();
-    // neighborhood = neighborhood_search.collectNeighborhoodWithInnerRadius(R_NEIGHBORHOOD_INNER_RADIUS);
 }
 
 void myNode3D::cutPointCheck(myNode3D &n)
@@ -27,13 +28,11 @@ void myNode3D::cutPointCheck(myNode3D &n)
     if (abs(neighborhoodCenterNode->g_score - n.neighborhoodCenterNode->g_score) > R_CP_GSCORE_DIFF)
         return;
 
-    // std::cout << "this_p_l: " << furthest_grandparent->g_score << "n_p_l: " << n.furthest_grandparent->g_score << std::endl;
-
     // Run path reconstruction for both
     auto short_path_to_this = search3D_ptr->reconstruct_path_with_length(*neighborhoodCenterNode, neighborhoodCenterNode->g_score * R_CP_PATH_PORTION);
     auto short_path_to_n = search3D_ptr->reconstruct_path_with_length(*n.neighborhoodCenterNode, neighborhoodCenterNode->g_score * R_CP_PATH_PORTION);
 
-    // Get root vertices
+    // Get root vertices (paths are a vector of simplices, we need one node from a simplex, we choose the one with largest weight)
     double maxWeight{-1};
     myNode3D *this_root{nullptr};
     for (auto it = short_path_to_this.back().begin(); it != short_path_to_this.back().end(); ++it)
@@ -49,28 +48,21 @@ void myNode3D::cutPointCheck(myNode3D &n)
             n_root = it->first;
     }
 
-    if (this_root == n_root)
+    if (this_root == n_root) // no need to check distance if they are the same
         return;
 
-    // SB: creating neighborhood centered on the furthest grandparent (then assign it to predecessors)
     cutPointSearchProblem<myNode3D> cpSearch(this_root, R_CP_UPPER_THRESHOLD, n_root, &search3D_ptr->startNode, search3D_ptr->occupancyMap);
     cpSearch.search();
 
     if (cpSearch.reachedGoal && cpSearch.pathLength > R_CP_LOWER_THRESHOLD)
-    // if (!mpSearch.reachedGoal)
     {
-        std::cout << "Path length: " << cpSearch.pathLength << std::endl;
         isCutPoint = true;
         n.isCutPoint = true;
         search3D_ptr->plotCutPoint(*this);
-        // plotCutPoint();
         search3D_ptr->plotCutPoint(n);
-        // n.plotCutPoint();
         generateCutPointRegion();
         for (auto &s : n.parent->successors)
-        {
             s.first->isCutPoint = true;
-        }
     }
 }
 
@@ -85,7 +77,6 @@ void myNode3D::generateCutPointRegion()
     {
         n->isCutPoint = true;
         search3D_ptr->plotCutPoint(*n);
-        // n->plotCutPoint();
     }
 }
 
@@ -98,6 +89,8 @@ int main(int argc, char *argv[])
     std::string expt_f_name = program_path + "../expt/3d_environments.json", expt_name = "env_genus_1";
     std::string param_f_name = program_path + "../expt/algorithm_parameters.json";
     std::string param_setName = "3d_original";
+
+    // to run: ./bin/3D_NAG_Search_$algorithm_name$ $env_name$ (optional) $parameter_set_name$ (optional)
     if (argc == 2)
     {
         expt_name = argv[1];
@@ -118,6 +111,7 @@ int main(int argc, char *argv[])
     std::cout << "Computation time: " << std::chrono::duration_cast<std::chrono::seconds>(search3D_inst.end_time - search3D_inst.start_time).count() << "s" << std::endl;
 
     search3D_inst.figure_to_display.get_key();
+    // Removes search progress visualizations (except cut points)
     for (int i{search3D_inst.MIN_X}; i < search3D_inst.MAX_X + 1; i++)
     {
         for (int j{search3D_inst.MIN_Y}; j < search3D_inst.MAX_Y + 1; j++)
@@ -126,12 +120,11 @@ int main(int argc, char *argv[])
             {
                 auto color_at_box = search3D_inst.displayBoxes.at(i).at(j).at(k)->color();
                 search3D_inst.displayBoxes.at(i).at(j).at(k)->visible() = (color_at_box == sglMake3vec(1, 0.6, 0));
-                // if (test_search_problem.displayBoxes.at(i).at(j).at(k)->visible())
-                //     color_at_box = sglMake3vec(1, 0.64706, 0);
             }
         }
     }
     search3D_inst.figure_to_display.flush();
+
     for (int i = 0; i < search3D_inst.foundGoals.size(); ++i)
     {
         // get path

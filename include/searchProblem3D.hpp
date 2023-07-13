@@ -1,17 +1,24 @@
-// Header file for the searchProblem class, for now class implementations are included
+// Header file for the searchProblem3D class
+
 // Guards
 #ifndef _SEARCHPROBLEM3D_H
 #define _SEARCHPROBLEM3D_H
 
+// Required for RSJParser
 #include <fstream>
+
 // Including libraries for parsing json files and maps
 #include "RSJparser.tcc"
-// User made
+
+// Planning related
 #include "myNode3D.hpp" // myNode class based on DOSL
 
+// For 3D visualization
 #include "sgl/sgl"
+
 #define bool bool
 
+// Global variables (algorithm parameters)
 double R_HEURISTIC_WEIGHT;
 int R_ROLLBACK_RADIUS;
 double R_NEIGHBORHOOD_RADIUS;
@@ -30,7 +37,6 @@ public:
     bool operator()(const myNode3D &n1, const myNode3D &n2) { return n1.isCoordsEqual(n2); }
 } compare_by_coord_only;
 
-// Implementation of searchProblem class
 class searchProblem3D : public _DOSL_ALGORITHM::Algorithm<searchProblem3D, myNode3D, double>
 {
 public:
@@ -39,20 +45,20 @@ public:
     RSJresource expt_container, param_container;
 
     // Environment variables
-    int env_scale;
-    COORD_TYPE MAX_X, MIN_X, MAX_Y, MIN_Y, MAX_Z, MIN_Z;
-    std::vector<cv::Point3d> obstacleCorners;
-    std::vector<cv::Point3d> obstacleDims;
-    cv::Mat occupancyMap;
-    int nPathsToFind;
-    myNode3D startNode, goalNode, lastExpanded;
+    int env_scale;                                       // scaling of the environment (defined in container)
+    COORD_TYPE MAX_X, MIN_X, MAX_Y, MIN_Y, MAX_Z, MIN_Z; // boundaries of the map
+    std::vector<cv::Point3d> obstacleCorners;            // obstacle corners (defined in container)
+    std::vector<cv::Point3d> obstacleDims;               // obstacle dimensions (defined in container)
+    cv::Mat occupancyMap;                                // occupancy map to be used for obstacle check
+    int nPathsToFind;                                    // desired number of paths
+    myNode3D startNode, goalNode, lastExpanded;          //
 
     // Visualization
-    sglFigure figure_to_display;
-    std::vector<std::vector<std::vector<sglBox *>>> displayBoxes;
-    double LINE_THICKNESS;
+    sglFigure figure_to_display;                                  // sgl object for the 3D visualization
+    std::vector<std::vector<std::vector<sglBox *>>> displayBoxes; // colored boxed to display search progress
+    double LINE_THICKNESS;                                        // thickness of the paths drawn
 
-    int REPORT_INTERVAL = 100;
+    int REPORT_INTERVAL = 100; // search progress report interval (in # expanded nodes)
 
     // Path progress
     int nPathsFound;
@@ -63,9 +69,10 @@ public:
     std::chrono::_V2::steady_clock::time_point current_time;
     std::chrono::_V2::steady_clock::time_point end_time;
 
-    // Discretization related
+    // Edges of the graph (designed to eliminate any degenerate simplices)
     double edges[14][3] = {{-1.0, 0.0, 0.0}, {1.0, 0.0, 0.0}, {0.0, -1.0, 0.0}, {0.0, 1.0, 0.0}, {-1.0, -1.0, -1.0}, {1.0, 1.0, 1.0}, {1.0, -1.0, 0.0}, {-1.0, 1.0, 0.0}, {0.0, -1.0, -1.0}, {0.0, 1.0, 1.0}, {-1.0, 0.0, -1.0}, {1.0, 0.0, 1.0}, {0.0, 0.0, -1.0}, {0.0, 0.0, 1.0}};
 
+    // Plotting functions
     void plotNode(myNode3D n, std::vector<double> col)
     {
         displayBoxes.at(n.x).at(n.y).at(n.z)->color() = col;
@@ -98,7 +105,7 @@ public:
             // sglSphere *sph = figure_to_display.addChild(sglSphere(p2.x, p2.y, p2.z, 0.1, 0.5, 0.5, 0.5));
         }
     }
-    // -----------------------------------------------------------
+
     // Constructor
     searchProblem3D(std::string expt_f_name, std::string expt_name, std::string param_f_name, std::string param_setName)
     {
@@ -184,8 +191,10 @@ public:
         }
         _dosl_cout << _BOLD _GREEN << "Occupancy Map generated!" << GREEN_ BOLD_ << _dosl_endl;
 
-        LINE_THICKNESS = expt_container["plot_options"]["line_thickness"].as<double>(2.0); // CV_FILLED
+        // plot options
+        LINE_THICKNESS = expt_container["plot_options"]["line_thickness"].as<double>(2.0);
 
+        // algorithm parameters
         R_HEURISTIC_WEIGHT = param_container["HEURISTIC_WEIGHT"].as<double>(1.0);
         R_ROLLBACK_RADIUS = param_container["ROLLBACK_RADIUS"].as<int>(1);
         R_NEIGHBORHOOD_RADIUS = param_container["NEIGHBORHOOD_RADIUS"].as<double>(1);
@@ -219,10 +228,19 @@ public:
         startNode = myNode3D(expt_container["start"][0].as<int>(), expt_container["start"][1].as<int>(), expt_container["start"][2].as<int>()) * env_scale;
         startNode.parent = &startNode;
         goalNode = myNode3D(expt_container["goal"][0].as<int>(), expt_container["goal"][1].as<int>(), expt_container["goal"][2].as<int>()) * env_scale;
-
         nPathsToFind = expt_container["n_paths"].as<int>(2);
         nPathsFound = 0;
 
+        std::cout << "=============================================================" << std::endl;
+        std::cout << "Running with map parameters: " << expt_Name << std::endl;
+        std::cout << "Environment scale: " << env_scale << std::endl;
+        std::cout << "Line thickness: " << LINE_THICKNESS << std::endl;
+        std::cout << "Number of paths to find: " << nPathsToFind << std::endl;
+        startNode.print("Start Node: ");
+        goalNode.print("Goal Node: ");
+        std::cout << "=============================================================" << std::endl;
+
+        // Visualization
         figure_to_display.height = 1200;
         figure_to_display.width = 1200;
         if (expt_container["init_cam"].exists())
@@ -264,15 +282,7 @@ public:
             }
         }
 
-        std::cout << "=============================================================" << std::endl;
-        std::cout << "Running with map parameters: " << expt_Name << std::endl;
-        std::cout << "Environment scale: " << env_scale << std::endl;
-        std::cout << "Line thickness: " << LINE_THICKNESS << std::endl;
-        std::cout << "Number of paths to find: " << nPathsToFind << std::endl;
-        startNode.print("Start Node: ");
-        goalNode.print("Goal Node: ");
-        std::cout << "=============================================================" << std::endl;
-
+        // Environment boundaries and xyz axis
         figure_to_display.init();
         figure_to_display.addChild(sglLine(MIN_X, MIN_Y, MIN_Z, MAX_X, MIN_Y, MIN_Z, 0, 0, 0));
         figure_to_display.addChild(sglLine(MIN_X, MIN_Y, MIN_Z, MIN_X, MAX_Y, MIN_Z, 0, 0, 0));
@@ -305,12 +315,12 @@ public:
         _dosl_cout << "Press any key to start the search" << _dosl_endl;
         std::cout << "=============================================================" << std::endl;
         figure_to_display.get_key();
+
         // Set planner variables
         all_nodes_set_p->reserve(ceil(MAX_X - MIN_X + 1));
     }
 
     // -----------------------------------------------------------
-
     // in bounds check
     bool isNodeInWorkspace(const myNode3D &tn)
     {
@@ -319,6 +329,8 @@ public:
         return (true);
     }
 
+    // Obstacle check (get collision value)
+    // Values depending on free space, at corner, on edge, on face, inside obstacle
     double getOccVal(const myNode3D &p)
     {
         if (!isNodeInWorkspace(p))
@@ -490,7 +502,6 @@ public:
         if ((!isNodeInWorkspace(tn1)) || !(isNodeInWorkspace(tn2)))
             return (false);
         myNode3D mid_pt((tn1.x + tn2.x) / 2, (tn1.y + tn2.y) / 2, (tn1.z + tn2.z) / 2);
-        // return (areCoordsFree(tn1) && areCoordsFree(tn2) && areCoordsFree(mid_pt));
         return (areCoordsFreeWithTolerance(tn1) && areCoordsFreeWithTolerance(tn2) && areCoordsFreeWithTolerance(mid_pt));
     }
 
@@ -503,15 +514,15 @@ public:
         tn.genNo = n.genNo + 1;
 
         tn.parent = &n; // assign parent pointer
-        // loop through in all directions
 
+        // loop through in all directions
         for (int a = 0; a < 14; ++a)
         {
+            // New coordinates
             tn.x = n.x + edges[a][0];
             tn.y = n.y + edges[a][1];
             tn.z = n.z + edges[a][2];
 
-            // if (!isEdgeAccessible(tn, n))
             if (!isEdgeAccessible(tn, n))
                 continue;
 
@@ -524,7 +535,6 @@ public:
     }
 
     // -----------------------------------------------------------
-
     double getHeuristics(myNode3D &n)
     {
         // With euclidean heuristic
@@ -538,7 +548,6 @@ public:
     }
 
     // -----------------------------------------------------------
-
     std::vector<myNode3D> getStartNodes(void)
     {
         std::vector<myNode3D> startNodes;
@@ -547,7 +556,6 @@ public:
     }
 
     // -----------------------------------------------------------
-
     void nodeEvent(myNode3D &n, unsigned int e)
     {
         std::vector<double> col{0, 0, 0};
@@ -563,9 +571,10 @@ public:
 #endif
             if (!cameFromNull)
             {
+                // Determine node color for plotting
                 std::vector<myNode3D *> nodes_at_same_xy = all_nodes_set_p->getall(n, compare_by_coord_only);
                 double rb_intensity = MAX(0.0, 1.0 - 0.2 * nodes_at_same_xy.size());
-                col = {rb_intensity, 1.0, rb_intensity};
+                col = {rb_intensity, 1.0, rb_intensity}; // shades of green
                 if (n.isCutPoint)
                     plotCutPoint(n);
                 else
@@ -582,16 +591,14 @@ public:
         {
             col = {0, 0, 1};
             if (n.genNo == 0)
-            {
-                n.parent = &n;
-            }
+                n.parent = &n; // reassign startNode parent (correct pointer this time)
             plotNode(n, col);
         }
         else if (e & UPDATED)
         {
+            // To update the parent based on new came from info
             n.parent = n.oneStepRollback();
             n.getNeighborhood(R_NEIGHBORHOOD_RADIUS, R_NEIGHBORHOOD_SEARCH_DEPTH);
-            // n.getNeighborhood(n.NEIGHBORHOOD_RADIUS);
             plotNode(n, {0.5, 0.5, 0.5});
         }
         else if (e & ERROR)
@@ -605,15 +612,12 @@ public:
 
         else
             return;
-
-        //-------------------------------------------
-        // figure_to_display.addChild(sglBox(n.x, n.y, n.z, n.x + 1, n.y + 1, n.z + 0.2, col[0], col[1], col[2], alpha));
     }
 
     // ---------------------------------------
-
+    // Stop conditions
     bool stopSearch(myNode3D &n)
-    { // Stop conditions
+    {
         if (n.isCoordsEqual(goalNode))
         {
             foundGoals.push_back(n);
