@@ -82,17 +82,23 @@ We use the default algorithm SStar, when prompted.
 ./bin/2D_NAG_Search_SStar map_indoor 2d_original
 ```
 
+![](/media/map_indoor.png)
+
 #### Obstacles and high cost regions
 
 ```
 ./bin/2D_NAG_Search_SStar map_nonuniform_with_obstacles 2d_original
 ```
 
+![](/media/map_nonuniform_with_obstacles.png)
+
 #### Extremely low curvature environment (low cost multiplier)
 
 ```
 ./bin/2D_NAG_Search_SStar map_single_high_cost 2d_with_cut
 ```
+
+![](/media/map_single_high_cost.png)
 
 ### 3D Examples
 

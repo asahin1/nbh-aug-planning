@@ -11,7 +11,7 @@
     '3d_original':{
         HEURISTIC_WEIGHT: 0.6,
         ROLLBACK_RADIUS: 3,
-        NEIGHBORHOOD_RADIUS : 6,
+        NEIGHBORHOOD_RADIUS : 5,
         NEIGHBORHOOD_SEARCH_DEPTH: 0
     },
 
