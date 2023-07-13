@@ -74,7 +74,6 @@ public:
     std::vector<sglBox *> in_figure_boxes;
     std::vector<sglLine *> in_figure_lines;
     float view_angle = 0.0f;
-    bool moving_cam = false;
 
     // Status defining variables
     bool waiting_for_keypress;
@@ -203,95 +202,8 @@ void sglFigure::draw(CPropertiesMap &parent_CP, LPropertiesMap &parent_child_LP)
         {
             glEnable(GL_BLEND); // Add alpha blending
             glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-
-            // Method 1:
-            // glDisable(GL_CULL_FACE);
-            // glDepthFunc(GL_LEQUAL);
-
-            // Method 2:
-            // double f = 0.75;
-            // glDisable(GL_CULL_FACE);
-            // glDepthFunc(GL_LEQUAL);
-
-            // glDisable(GL_CULL_FACE);
-            // glDepthFunc(GL_GREATER);
-
-            // glDisable(GL_CULL_FACE);
-            // glDepthFunc(GL_LEQUAL);
-
-            // Method 3:
-            // double f = 0.75;
-            // glDisable(GL_CULL_FACE);
-            // glDepthFunc(GL_ALWAYS);
-
-            // glDisable(GL_CULL_FACE);
-            // glDepthFunc(GL_LEQUAL);
-
-            // Method 4:
-            // glDisable(GL_CULL_FACE);
-            // glDepthFunc(GL_LESS);
-
-            // for (auto it = childObjects_p.begin(); it != childObjects_p.end(); ++it)
-            // {
-            //     it->first->draw(this_CP, it->second);
-            // }
-
-            // glEnable(GL_CULL_FACE);
-            // glCullFace(GL_FRONT);
-            // glDepthFunc(GL_ALWAYS);
-
-            // for (auto it = childObjects_p.begin(); it != childObjects_p.end(); ++it)
-            // {
-            //     it->first->draw(this_CP, it->second);
-            // }
-
-            // glEnable(GL_CULL_FACE);
-            // glCullFace(GL_FRONT);
-            // glDepthFunc(GL_LEQUAL);
-
-            // for (auto it = childObjects_p.begin(); it != childObjects_p.end(); ++it)
-            // {
-            //     it->first->draw(this_CP, it->second);
-            // }
-
-            // glEnable(GL_CULL_FACE);
-            // glCullFace(GL_BACK);
-            // glDepthFunc(GL_ALWAYS);
-
-            // for (auto it = childObjects_p.begin(); it != childObjects_p.end(); ++it)
-            // {
-            //     it->first->draw(this_CP, it->second);
-            // }
-
-            // glEnable(GL_CULL_FACE);
-            // glCullFace(GL_BACK);
-            // glDepthFunc(GL_LEQUAL);
-
-            // for (auto it = childObjects_p.begin(); it != childObjects_p.end(); ++it)
-            // {
-            //     it->first->draw(this_CP, it->second);
-            // }
-
-            // glDisable(GL_CULL_FACE);
-            // glDepthFunc(GL_LEQUAL);
         }
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-        if (moving_cam)
-        {
-            glLoadIdentity();
-            // glScalef(0.04f, 0.04f, 0.04f);
-            glScalef(cam_scale, cam_scale, cam_scale);
-            if (!init_cam_config.empty())
-                gluLookAt(init_cam_config[0], init_cam_config[1], init_cam_config[2],
-                          init_cam_config[3], init_cam_config[4], init_cam_config[5],
-                          init_cam_config[6], init_cam_config[7], init_cam_config[8]);
-            else
-                gluLookAt(5.0f, 5.0f, 50.0f,
-                          0.0f, 0.0f, 0.0f,
-                          0.0f, 1.0f, 0.0f);
-            glRotatef(view_angle, 0.0f, 0.0f, 1.0f);
-            view_angle += 0.20f;
-        }
         // Draw the children
         GLdouble gl_matrix[16];
         glGetDoublev(GL_MODELVIEW_MATRIX, gl_matrix);
@@ -404,11 +316,6 @@ void sglFigure::init(int argc, char *argv[])
     if (alpha() >= 0.0)
     {
         glutInitDisplayMode(GLUT_DEPTH | GLUT_DOUBLE | GLUT_RGBA); //(GLUT_SINGLE|GLUT_RGBA);
-        /*glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-        glEnable(GL_BLEND);*/
-        // glLightModeli(GL_LIGHT_MODEL_TWO_SIDE, GL_TRUE);
-        // glEnable(GL_BLEND); // Add alpha blending
-        // glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
     }
     else
         glutInitDisplayMode(GLUT_DEPTH | GLUT_DOUBLE | GLUT_RGB);
@@ -435,13 +342,7 @@ void sglFigure::init(int argc, char *argv[])
     // glViewport(-2.0, -2.0, 4.0, 4.0);
     glMatrixMode(GL_PROJECTION);
     glLoadIdentity();
-    // glRotated(90.0, 1.0, 0.0, 0.0);
-
-    // gluPerspective(30.0, 1.0, 0.1, 100.0); // perspective proj.
-    // glOrtho(-2.0, 2.0, -2.0, 2.0, 0.1, 100.0);
-    // glScalef(1.0f, -1.0f, 1.0f);
     glOrtho(-1.0, 1.0, -1.0, 1.0, 0, 300.0);
-    // glFrustum(-1.0, 1.0, -1.0, 1.0, 1.5, 100.0);
 
     glMatrixMode(GL_MODELVIEW);
     glLoadIdentity();

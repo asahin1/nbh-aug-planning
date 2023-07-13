@@ -1,22 +1,22 @@
-// Main .cpp file for performing the search and plotting results
-// Also includes some function implementations
+// Main file for running search on 2D graph
+// Also includes some method implementations for myNode2D class (these need the pointer to the primary search instance)
+
 // =============================================================
 // dosl utils
 #include <dosl/aux-utils/string_utils.hpp> // compute_program_path
-// User made
+
+// Planning related
 #include "include/searchProblem2D.hpp" // searchProblem class based on DOSL
 
-searchProblem2D *search2D_ptr{nullptr}; // A searchProblem pointer(NULL for now), required for function implementations
+searchProblem2D *search2D_ptr{nullptr}; // A searchProblem2D pointer(NULL for now), required for method implementations
 
 void myNode2D::getNeighborhood(double nbRadius, int minSearchDepth)
 {
     findNeighborhoodCenter();
-    // SB: creating neighborhood centered on the furthest grandparent (then assign it to predecessors)
-    neighborhoodSearchProblem<myNode2D> neighborhood_search(neighborhoodCenterNode, nbRadius, R_HEURISTIC_WEIGHT, minSearchDepth, &search2D_ptr->startNode, search2D_ptr->parsedMap);
+    neighborhoodSearchProblem<myNode2D> neighborhood_search(neighborhoodCenterNode, nbRadius, R_HEURISTIC_WEIGHT,
+                                                            minSearchDepth, &search2D_ptr->startNode, search2D_ptr->parsedMap);
     neighborhood_search.search();
-
     neighborhood = neighborhood_search.collectNeighborhood();
-    // neighborhood = neighborhood_search.collectNeighborhoodWithInnerRadius(R_NEIGHBORHOOD_INNER_RADIUS);
 }
 
 void myNode2D::cutPointCheck(myNode2D &n)
@@ -24,15 +24,13 @@ void myNode2D::cutPointCheck(myNode2D &n)
     findNeighborhoodCenter();
     n.findNeighborhoodCenter();
     if (abs(neighborhoodCenterNode->g_score - n.neighborhoodCenterNode->g_score) > R_CP_GSCORE_DIFF)
-    {
         return;
-    }
 
     // Run path reconstruction for both
     auto short_path_to_this = search2D_ptr->reconstruct_path_with_length(*neighborhoodCenterNode, neighborhoodCenterNode->g_score * R_CP_PATH_PORTION);
     auto short_path_to_n = search2D_ptr->reconstruct_path_with_length(*n.neighborhoodCenterNode, neighborhoodCenterNode->g_score * R_CP_PATH_PORTION);
 
-    // Get root vertices
+    // Get root vertices (paths are a vector of simplices, we need one node from a simplex, we choose the one with largest weight)
     double maxWeight{-1};
     myNode2D *this_root{nullptr};
     for (auto it = short_path_to_this.back().begin(); it != short_path_to_this.back().end(); ++it)
@@ -48,8 +46,9 @@ void myNode2D::cutPointCheck(myNode2D &n)
             n_root = it->first;
     }
 
-    if (this_root == n_root)
+    if (this_root == n_root) // no need to check distance if they are the same
         return;
+
     cutPointSearchProblem<myNode2D> cpSearch(this_root, R_CP_UPPER_THRESHOLD, n_root, &search2D_ptr->startNode, search2D_ptr->parsedMap);
     cpSearch.search();
 
@@ -58,14 +57,10 @@ void myNode2D::cutPointCheck(myNode2D &n)
         isCutPoint = true;
         n.isCutPoint = true;
         search2D_ptr->plotCutPoint(*this);
-        // plotCutPoint();
         search2D_ptr->plotCutPoint(n);
-        // n.plotCutPoint();
         generateCutPointRegion();
         for (auto &s : n.parent->successors)
-        {
             s.first->isCutPoint = true;
-        }
     }
 }
 
@@ -80,8 +75,6 @@ void myNode2D::generateCutPointRegion()
     {
         n->isCutPoint = true;
         search2D_ptr->plotCutPoint(*n);
-        // n->plotCutPoint();
-        // cv::waitKey(0);
     }
 }
 
@@ -94,6 +87,7 @@ int main(int argc, char *argv[])
     std::string param_f_name = program_path + "../expt/algorithm_parameters.json";
     std::string param_setName = "2d_original";
 
+    // to run: ./bin/2D_NAG_Search_$algorithm_name$ $map_name$ (optional) $parameter_set_name$ (optional)
     if (argc == 2)
     {
         expt_name = argv[1];
@@ -120,7 +114,7 @@ int main(int argc, char *argv[])
         search2D_inst.plotPath(search2D_inst.image_to_display, path, cvScalar(102.0, 0.0, 204.0));
         search2D_inst.plotPath(search2D_inst.cleanMap, path, cvScalar(0.0, 102.0, 0.0));
         cv::imshow("Display window", search2D_inst.image_to_display);
-        char key = (char)cv::waitKey(); // explicit cast
+        char key = (char)cv::waitKey();
         while (key != 27)
         {
             key = (char)cv::waitKey();
@@ -137,7 +131,7 @@ int main(int argc, char *argv[])
     search2D_inst.cvPlotStartGoal(search2D_inst.cleanMap);
     cv::imshow("Display window", search2D_inst.image_to_display);
     cv::imshow("Original window", search2D_inst.cleanMap);
-    char key = (char)cv::waitKey(); // explicit cast
+    char key = (char)cv::waitKey();
     while (key != 27)
     {
         key = (char)cv::waitKey();

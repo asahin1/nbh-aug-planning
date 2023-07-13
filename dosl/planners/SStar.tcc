@@ -374,17 +374,10 @@ void SStar::Algorithm<AlgDerived, NodeType, CostType>::generate_successors(NodeT
 
             auto tmp_npc = _DOSL_SMALL_MAP_pairfun(all_nodes_set_p->get(this_successors[a]), this_transition_costs[a]); // *SB
 
-            // if (!tmp_npc.first->isCutPoint) // *SB: don't make new connections to known merge points
-            //     node_in_hash_p->successors.insert(tmp_npc);
-            if (tmp_npc.first->isCutPoint) // *SB: don't make new connections to known merge points
+            if (tmp_npc.first->isCutPoint)
                 break;
             node_in_hash_p->successors.insert(tmp_npc);
         }
-        // if (node_in_hash_p->special_neighbor)
-        // {
-        //     auto tmp_npc = _DOSL_SMALL_MAP_pairfun(node_in_hash_p->special_neighbor, 0.001);
-        //     node_in_hash_p->successors.insert(tmp_npc);
-        // }
         node_in_hash_p->successors_created = true;
     }
 }
@@ -489,19 +482,7 @@ void SStar::Algorithm<AlgDerived, NodeType, CostType>::search(void)
         if (thisNodeInHash_p->isCutPoint)
         {
             _this->nodeEvent(*thisNodeInHash_p, EXPANDED | POPPED);
-            // thisNodeInHash_p->expanded = true; // Put in closed list
-            // if (_this->stopSearch(*thisNodeInHash_p))
-            // {
-            //     if (_dosl_verbose_on(0))
-            //         if (progress_show_interval > 0)
-            //         {
-            //             thisNodeInHash_p->print("Stopping search ('stopSearch' returned true) at: ");
-            //             _dosl_printf("... Number of states expanded: %d. Heap size: %d. Time elapsed: %f s.",
-            //                          expand_count, node_heap_p->size(), timer.read());
-            //         }
-            //     return;
-            // }
-            continue; // *SB
+            continue;
         }
 
 #if _DOSL_EVENTHANDLER
@@ -670,19 +651,6 @@ void SStar::Algorithm<AlgDerived, NodeType, CostType>::search(void)
             test_g_val = std::numeric_limits<CostType>::max();
             for (auto it2 = attachedMaximalSimplices.begin(); it2 != attachedMaximalSimplices.end(); ++it2)
             {
-                // ===========================================
-                // bool skipMergePointSimplex = false;
-                // for (auto it3 : (*it2)->p)
-                // {
-                //     if (it3->isCutPoint)
-                //     {
-                //         skipMergePointSimplex = true;
-                //         break;
-                //     }
-                // }
-                // if (skipMergePointSimplex)
-                //     continue;
-                // ===========================================
                 if (_dosl_verbose_on(2))
                 {
                     (*it2)->print("Attached maximal simplex:");
@@ -741,21 +709,6 @@ void SStar::Algorithm<AlgDerived, NodeType, CostType>::search(void)
                     }
             }
 #endif
-
-            ///////////////////////////////////////////////////////////////////////////////
-            NodeType *test_node = NULL;
-            double test_w = 0;
-            for (const auto &p : test_came_from_simplex->p)
-            {
-                if (test_came_from_simplex->w[p] > test_w)
-                {
-                    test_node = p;
-                    test_w = test_came_from_simplex->w[p];
-                }
-            }
-            // test_node->print("Test node: ");
-            // test_node->plotPathTo();
-            //////////////////////////////////////////////////////////////////////////////
 
             // ---------------------------------------------------------
             if (_dosl_verbose_on(1))

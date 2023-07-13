@@ -1,4 +1,5 @@
-// Header file for the searchProblem class, for now class implementations are included
+// Header file for the searchProblem2D class
+
 // Guards
 #ifndef _SEARCHPROBLEM2D_H
 #define _SEARCHPROBLEM2D_H
@@ -7,7 +8,7 @@
 #include <dosl/aux-utils/cvParseMap2d.hpp>
 #include "RSJparser.tcc"
 
-// User made
+// Planning related
 #include "myNode2D.hpp" // myNode class based on DOSL
 
 // Global variables (algorithm parameters)
@@ -29,7 +30,6 @@ public:
     bool operator()(const myNode2D &n1, const myNode2D &n2) { return n1.isCoordsEqual(n2); }
 } compare_by_coord_only;
 
-// Implementation of searchProblem class
 class searchProblem2D : public _DOSL_ALGORITHM::Algorithm<searchProblem2D, myNode2D, double>
 {
 public:
@@ -38,22 +38,22 @@ public:
     RSJresource expt_container, param_container;
 
     // Environment variables
-    cvParseMap2d parsedMap;
-    COORD_TYPE MAX_X, MIN_X, MAX_Y, MIN_Y; // boundaries of the map - set at searchProblem constructor
-    int nPathsToFind;
-    bool nonuniform;
-    double NONUNIFORM_COST_MULTIPLIER;
-    myNode2D startNode, goalNode, lastExpanded;
+    cvParseMap2d parsedMap;                     // used for obstacle checks
+    COORD_TYPE MAX_X, MIN_X, MAX_Y, MIN_Y;      // boundaries of the map
+    int nPathsToFind;                           // desired number of paths
+    bool nonuniform;                            // cost type
+    double NONUNIFORM_COST_MULTIPLIER;          // cost multiplier (CM)
+    myNode2D startNode, goalNode, lastExpanded; //
 
     // Visualization
-    cv::Mat originalMapMatrix;
-    cv::Mat image_to_display;
-    cv::Mat cleanMap;
-    double PLOT_SCALE; // scale read from json file (effects how large the display window looks)
-    double LINE_THICKNESS;
+    cv::Mat originalMapMatrix; // pixel matrix of the original map
+    cv::Mat image_to_display;  // display image (showing search progress)
+    cv::Mat cleanMap;          // clean version of the pixel map
+    double PLOT_SCALE;         // scale read from json file (effects how large the display window looks)
+    double LINE_THICKNESS;     // thickness of the paths drawn
 
-    int VIS_INTERVAL = 1000; // used for speeding and slowing display/search
-    int REPORT_INTERVAL = 1000;
+    int VIS_INTERVAL = 1000;    // update frequency of display image (in # expanded nodes)
+    int REPORT_INTERVAL = 1000; // search progress report interval (in # expanded nodes)
 
     // Path progress
     int nPathsFound;
@@ -66,7 +66,7 @@ public:
 
     // -----------------------------------------------------------
 
-    // coordinate transformation
+    // coordinate transformation (original pixels to display image)
     template <typename T>
     CvPoint cv_plot_coord(T x, T y)
     {
@@ -180,9 +180,9 @@ public:
         std::ifstream param_fstream(param_fName);
         param_container = RSJresource(param_fstream)[param_setName];
 
+        // Read map
         map_image_fName = expt_folderName + expt_container["environment"]["pixmap"].as<std::string>();
         parsedMap = cvParseMap2d(map_image_fName, true);
-
         plot_image_fName = expt_folderName + expt_container["plot_options"]["plot_map"].as<std::string>();
 
         // Cost type
@@ -206,10 +206,11 @@ public:
             originalMapMatrix = cv::imread(map_image_fName, CV_LOAD_IMAGE_COLOR);
         }
 
-        // display options
+        // plot options
         PLOT_SCALE = expt_container["plot_options"]["plot_scale"].as<double>(1.0);
         LINE_THICKNESS = expt_container["plot_options"]["line_thickness"].as<double>(2.0); // CV_FILLED
 
+        // algorithm parameters
         R_HEURISTIC_WEIGHT = param_container["HEURISTIC_WEIGHT"].as<double>(1.0);
         R_ROLLBACK_RADIUS = param_container["ROLLBACK_RADIUS"].as<int>(1);
         R_NEIGHBORHOOD_RADIUS = param_container["NEIGHBORHOOD_RADIUS"].as<double>(1);
@@ -262,10 +263,10 @@ public:
         goalNode.print("Goal Node: ");
         std::cout << "=============================================================" << std::endl;
 
+        // visualization
         image_to_display = originalMapMatrix.clone();
         cv::resize(image_to_display, image_to_display, cv::Size(), PLOT_SCALE, PLOT_SCALE);
         cleanMap = image_to_display.clone(); // copy resized version of original map, store as a clean copy
-        // Display window
         cv::namedWindow("Display window", cv::WINDOW_AUTOSIZE);
         cv::moveWindow("Display window", 50, 50);
         popUpText("Press any key to show start and goal");
@@ -274,12 +275,12 @@ public:
         cv::imshow("Display window", image_to_display);
         popUpText("Press any key to start the search");
         cvPlotStartGoal(cleanMap);
+
         // Set planner variables
         all_nodes_set_p->reserve(ceil(MAX_X - MIN_X + 1));
     }
 
     // -----------------------------------------------------------
-
     // in bounds check
     bool isNodeInWorkspace(const myNode2D &tn)
     {
@@ -307,6 +308,7 @@ public:
         return (true);
     }
 
+    // Nonuniform path cost computation (refer to Section 3F - Cost multiplier analysis for details)
     double costAtPixel(const int x, const int y) const
     {
         double cost_multiplier{0};
@@ -332,12 +334,13 @@ public:
         tn.genNo = n.genNo + 1;
 
         tn.parent = &n; // assign parent pointer
+
         // loop through in all directions
         for (int a = -1; a <= 1; ++a)
             for (int b = -1; b <= 1; ++b)
             {
                 if (a == 0 && b == 0)
-                    continue; // staying in the same spot is not valid
+                    continue;
 
 // Do not create degenerate simplices
 #ifdef DOSL_ALGORITHM_SStar
@@ -370,6 +373,7 @@ public:
             }
     }
 
+    // Visibility check required for ThetaStar
     bool isSegmentFree(myNode2D &n1, myNode2D &n2, double *c)
     {
         double dx = (double)(n2.x - n1.x), dy = (double)(n2.y - n1.y);
@@ -408,7 +412,6 @@ public:
     {
         std::vector<myNode2D> startNodes;
         startNodes.push_back(startNode);
-        // plotNode(image_to_display, startNode, cvScalar(0, 0, 0));
         return (startNodes);
     }
 
@@ -498,9 +501,9 @@ public:
     }
 
     // ---------------------------------------
-
+    // Stop conditions
     bool stopSearch(myNode2D &n)
-    { // Stop conditions
+    {
         if (n.isCoordsEqual(goalNode))
         {
             foundGoals.push_back(n);

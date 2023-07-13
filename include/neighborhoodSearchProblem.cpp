@@ -1,9 +1,13 @@
+// Node and search problem class definitions for neighborhood search
+// Refer to Algorithm 3 (computePNS)
+
 #include "dosl/planners/AStar_original.tcc"
 #include "dosl/planners/SStar_original.tcc"
 #include "dosl/planners/ThetaStar_original.tcc"
 
 #include <dosl/aux-utils/cvParseMap2d.hpp>
 
+// Can potentially use other algorithms for neighborhood search (AStar works the best for now)
 #define SEARCH2_ALG AStar_original
 
 template <class nodeType>
@@ -27,10 +31,8 @@ public:
             return true;
         }
         return false;
-        // return (np == n.np);
     }
 
-    // An efficint hash function, 'getHashBin', for node type is desired, but is optional.
     int getHashBin(void) { return ((int)((long int)np % 1000)); }
 };
 
@@ -38,9 +40,10 @@ template <class nodeType>
 class neighborhoodSearchProblem : public SEARCH2_ALG::Algorithm<neighborhoodSearchProblem<nodeType>, neighborhoodSearchNode<nodeType>, double>
 {
 public:
+    // Existing nodes on the graph
     using SEARCH2_ALG::Algorithm<neighborhoodSearchProblem<nodeType>, neighborhoodSearchNode<nodeType>, double>::all_nodes_set_p;
-
     typedef neighborhoodSearchNode<nodeType> NSN;
+
     NSN centerNode;
     int minSearchDepth;
     double nb_radius;
@@ -48,8 +51,8 @@ public:
     NSN primary_search_start;
     cvParseMap2d env2D;
     cv::Mat env3D;
-    // Alternatively
     std::unordered_set<nodeType *> neighborhood;
+
     neighborhoodSearchProblem(nodeType *p, double nr, double hw, int mg, nodeType *s)
         : nb_radius(nr), heuristic_weight(hw), minSearchDepth(mg)
     {
@@ -69,18 +72,16 @@ public:
         primary_search_start = NSN(s);
     }
 
-    // void getSuccessors(NSN &n, std::vector<NSN> *s, std::vector<int> *c)
     void getSuccessors(NSN &n, std::vector<NSN> *s, std::vector<double> *c)
     {
-        // This function should account for obstacles, constraints and size of environment
+        // Follow through the existing edges in the graph
         for (auto it = n.np->successors.begin(); it != n.np->successors.end(); ++it)
         {
+            // Skip any nodes whose successors are not created or that are cut points
             if (!it->first->successors_created)
                 continue;
             if (it->first->isCutPoint)
                 continue;
-            // if (it->first->g_score >= n.np->g_score)
-            //     continue;
             NSN tn(it->first);
             tn.generation_no = n.generation_no + 1;
             s->push_back(tn);
@@ -88,6 +89,7 @@ public:
         }
     }
 
+    // Visibility check (required for ThetaStar only)
     bool isSegmentFree(NSN &n1, NSN &n2, double *c)
     {
 #ifdef _SEARCHPROBLEM3D_H
@@ -128,11 +130,7 @@ public:
 
     double getHeuristics(NSN &n)
     {
-        // std::cout << n.np->g_score << std::endl;
         return heuristic_weight * (n.np->g_score);
-        // double dx = primary_search_start.np->x - n.np->x;
-        // double dy = primary_search_start.np->y - n.np->y;
-        // return 0.5*(sqrt(dx * dx + dy * dy));
         // return 0;
     }
 
@@ -145,20 +143,16 @@ public:
 
     bool stopSearch(NSN &n)
     {
-        if (n.np->isCoordsEqual(*primary_search_start.np))
-        {
-            // _dosl_cout << "Secondary search: Arrived primary start" << _dosl_endl;
+        if (n.np->isCoordsEqual(*primary_search_start.np)) // No need to go further if the start node of the primary search
+            return true;                                   // is reached (that will be common for all)
+        if (n.generation_no < minSearchDepth)              // minimum depth check
+            return false;                                  //
+        if (n.g_score > nb_radius)                         // neighborhood radius check
             return true;
-        }
-        if (n.generation_no < minSearchDepth)
-            return false;
-        if (n.g_score > nb_radius)
-        {
-            return true;
-        }
         return false;
     }
 
+    // Collect all expanded nodes
     std::unordered_set<nodeType *> collectNeighborhood()
     {
 
@@ -168,27 +162,7 @@ public:
                 NSN *dummy = all_nodes_set_p->HashTable[b][c];
                 if (dummy->expanded)
                     neighborhood.insert(dummy->np);
-                // Need to remove the g-score check for nonuniform cost maps
-                // if (dummy->g_score <= nb_radius && dummy->expanded)
-                // {
-                // }
             }
         return neighborhood;
-    }
-
-    std::unordered_set<nodeType *> collectNeighborhoodWithRadius(double radius)
-    {
-
-        std::unordered_set<nodeType *> nb_with_radius;
-        for (int b = 0; b < all_nodes_set_p->hash_table_size; ++b)
-            for (int c = 0; c < all_nodes_set_p->HashTable[b].size(); ++c)
-            {
-                NSN *dummy = all_nodes_set_p->HashTable[b][c];
-                if (dummy->g_score <= radius && dummy->expanded)
-                {
-                    nb_with_radius.insert(dummy->np);
-                }
-            }
-        return nb_with_radius;
     }
 };

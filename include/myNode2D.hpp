@@ -4,34 +4,27 @@
 #ifndef _MYNODE2D_H
 #define _MYNODE2D_H
 
-// Standard libraries
-// #include <unordered_set>
-
-// DOSL macros
+// DOSL
 #define _DOSL_CHECK_GRAPH_DIRECTIONALITY 2 // set 2 for auto-fix
 #ifndef _DOSL_ALGORITHM                    // can pass at command line during compilation: -D_DOSL_ALGORITHM=AStar
 #define _DOSL_ALGORITHM SStar
 #endif
-
-// DOSL
 #include <dosl/dosl>
 
-// User made
-#include "neighborhoodSearchProblem.cpp" // coded by SB
+// Planning related
+#include "neighborhoodSearchProblem.cpp"
 #include "cutPointSearchProblem.cpp"
-#include "tools.hpp" // some global variables and helper functions
+#include "tools.hpp"
 
-// Declaration of myNode class
 class myNode2D : public _DOSL_ALGORITHM::Node<myNode2D, double>
 {
 public:
-    // Attributes
     COORD_TYPE x, y;                             // coordinates
-    myNode2D *parent = nullptr;                  // pointer to parent (at generation time)
-    myNode2D *neighborhoodCenterNode = nullptr;  // pointer to furthest grandparent (updated during predecessor rollback)
-    std::unordered_set<myNode2D *> neighborhood; // set of predecessors (generated during comparison)
-    bool isCutPoint = false;                     // merge point flag
-    int genNo{0};
+    myNode2D *parent = nullptr;                  // parent node
+    myNode2D *neighborhoodCenterNode = nullptr;  // center of the neighborhood (obtained by rollback)
+    std::unordered_set<myNode2D *> neighborhood; // path neighborhood set
+    bool isCutPoint = false;                     // cut point flag
+    int genNo{0};                                // search depth maintained as generation number
 
     // Updates and checks
     myNode2D *oneStepRollback();
@@ -40,14 +33,12 @@ public:
     void cutPointCheck(myNode2D &n);
     void generateCutPointRegion();
 
-    bool isCoordsEqual(const myNode2D &n) const;   // coordinate comparison
-    bool hasNeighborhoodIntersection(myNode2D &n); // predecessor comparison
-
     double getDistance(const myNode2D &n) const;
 
-    // *** This must be defined for the node
-    // Comparison
-    bool operator==(myNode2D &n);
+    bool isCoordsEqual(const myNode2D &n) const;   // coordinate comparison
+    bool hasNeighborhoodIntersection(myNode2D &n); // neighborhood comparison
+    // This must be defined for the node
+    bool operator==(myNode2D &n); // comparison
 
     // constructors
     myNode2D() {}

@@ -1,9 +1,14 @@
+// Node and search problem definitions for cut point search
+// Cut point search is being used to check the distance between path points p_w and p_v'
+// Refer to Algorithm 4 Line 8 (searchOnGraph)
+
 #include "dosl/planners/AStar_original.tcc"
 #include "dosl/planners/SStar_original.tcc"
 #include "dosl/planners/ThetaStar_original.tcc"
 
 #include <dosl/aux-utils/cvParseMap2d.hpp>
 
+// Can potentially use other algorithms for cut point search (AStar works the best for now)
 #define SEARCH2_ALG AStar_original
 
 template <class nodeType>
@@ -27,10 +32,8 @@ public:
             return true;
         }
         return false;
-        // return (np == n.np);
     }
 
-    // An efficint hash function, 'getHashBin', for node type is desired, but is optional.
     int getHashBin(void) { return ((int)((long int)np % 1000)); }
 };
 
@@ -38,12 +41,12 @@ template <class nodeType>
 class cutPointSearchProblem : public SEARCH2_ALG::Algorithm<cutPointSearchProblem<nodeType>, cutPointSearchNode<nodeType>, double>
 {
 public:
+    // Existing nodes on the graph
     using SEARCH2_ALG::Algorithm<cutPointSearchProblem<nodeType>, cutPointSearchNode<nodeType>, double>::all_nodes_set_p;
-
     typedef cutPointSearchNode<nodeType> CPSN;
+
     CPSN start;
     CPSN goal;
-    // int minSearchDepth;
     double maxSearchRadius;
     CPSN primary_search_start;
     bool reachedGoal{false};
@@ -73,28 +76,24 @@ public:
         primary_search_start = CPSN(s);
     }
 
-    // void getSuccessors(NSN &n, std::vector<NSN> *s, std::vector<int> *c)
     void getSuccessors(CPSN &n, std::vector<CPSN> *s, std::vector<double> *c)
     {
-        // This function should account for obstacles, constraints and size of environment
+        // Follow through the existing edges in the graph
         for (auto it = n.np->successors.begin(); it != n.np->successors.end(); ++it)
         {
+            // Skip any nodes whose successors are not created or that are cut points
             if (!it->first->successors_created)
                 continue;
             if (it->first->isCutPoint)
                 continue;
-            // if (it->first->g_score >= n.np->g_score)
-            //     continue;
             CPSN tn(it->first);
             tn.generation_no = n.generation_no + 1;
             s->push_back(tn);
             c->push_back(it->second);
-            // Use euclidean distance without the cost multiplier
-            // double cost = n.np->getDist(*it->first);
-            // c->push_back(cost);
         }
     }
 
+    // Visibility check (required for ThetaStar only)
     bool isSegmentFree(CPSN &n1, CPSN &n2, double *c)
     {
 #ifdef _SEARCHPROBLEM3D_H
@@ -135,14 +134,10 @@ public:
 
     double getHeuristics(CPSN &n)
     {
-        // std::cout << n.np->g_score << std::endl;
+        // Euclidean distance heuristic
         double dx = start.np->x - goal.np->x;
         double dy = start.np->y - goal.np->y;
         return sqrt(dx * dx + dy * dy);
-        // return 0;
-        // double dx = primary_search_start.np->x - n.np->x;
-        // double dy = primary_search_start.np->y - n.np->y;
-        // return 0.5*(sqrt(dx * dx + dy * dy));
         // return 0;
     }
 
@@ -155,20 +150,13 @@ public:
 
     bool stopSearch(CPSN &n)
     {
-        // if (n.np->isCoordsEqual(*primary_search_start.np))
-        // {
-        //     // _dosl_cout << "Secondary search: Arrived primary start" << _dosl_endl;
-        //     return true;
-        // }
-        // if (n.generation_no < min_generations)
-        //     return false;
-        if (n == goal)
-        {
-            reachedGoal = true;
-            pathLength = n.g_score;
-            return true;
-        }
-        if (n.g_score > maxSearchRadius)
+        if (n == goal)                   // Goal reached within radius
+        {                                //
+            reachedGoal = true;          //
+            pathLength = n.g_score;      //
+            return true;                 //
+        }                                //
+        if (n.g_score > maxSearchRadius) // Maximum radius exceeded
         {
             reachedGoal = false;
             return true;

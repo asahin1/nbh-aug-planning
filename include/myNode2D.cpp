@@ -2,16 +2,14 @@
 
 myNode2D *myNode2D::oneStepRollback()
 {
-    // This is an attempt (for SStar, for AStar it is supposed to work as intended)
-    // to rollback one step
 #ifdef DOSL_ALGORITHM_SStar
     myNode2D *cfv{nullptr};
+    // Follow through the node with highest weight in the simplex
     if (CameFromSimplex != NULL)
     {
         double maxWeight{-1};
         for (auto &s : CameFromSimplex->p)
         {
-            // if (CameFromSimplex->w[s] > maxWeight && !s->isMergePoint) // this causes segmentation faults (occasionally)
             if (CameFromSimplex->w[s] > maxWeight)
             {
                 maxWeight = CameFromSimplex->w[s];
@@ -22,6 +20,7 @@ myNode2D *myNode2D::oneStepRollback()
     if (cfv)
         return cfv;
 #else
+    // Follow through came from nodes
     if (came_from)
         return came_from;
 #endif
@@ -40,43 +39,41 @@ void myNode2D::findNeighborhoodCenter()
 }
 
 bool myNode2D::isCoordsEqual(const myNode2D &n) const
-{ // Coordinate based comparison
+{
     return ((x == n.x) && (y == n.y));
 }
 
 bool myNode2D::hasNeighborhoodIntersection(myNode2D &n)
 {
-    // Collect predecessors
+    // Generate neighborhood (if not generated before)
     if (neighborhood.empty())
         getNeighborhood(R_NEIGHBORHOOD_RADIUS, R_NEIGHBORHOOD_SEARCH_DEPTH);
     if (n.neighborhood.empty())
         n.getNeighborhood(R_NEIGHBORHOOD_RADIUS, R_NEIGHBORHOOD_SEARCH_DEPTH);
-    // Check for overlap
+
+    // Check for intersection
     int commonNeighbors = 0;
-    std::unordered_set<myNode2D *> commonNodes;
     for (auto &i : neighborhood)
     {
-        if (i->isCutPoint)
+        if (i->isCutPoint) // Cut points do not count
             continue;
         if (n.neighborhood.count(i) != 0)
-        {
             commonNeighbors++;
-            commonNodes.insert(i);
-        }
     }
+
     int overlapDenominator = std::max(neighborhood.size(), n.neighborhood.size());
     double neighborhoodOverlap = static_cast<double>(commonNeighbors) * 100 / overlapDenominator;
 
     if (neighborhoodOverlap > 0)
     {
-        if (isCutPoint)
+        if (R_CUT_POINT_CHECK)
         {
-            n.isCutPoint = true;
-            return true;
-        }
-        if (neighborhoodOverlap <= R_OVERLAP_FOR_CP)
-        {
-            if (R_CUT_POINT_CHECK)
+            if (isCutPoint)
+            {
+                n.isCutPoint = true; // Nodes were going to be identified as the same anyway, no need to check again
+                return true;
+            }
+            if (neighborhoodOverlap <= R_OVERLAP_FOR_CP)
                 cutPointCheck(n);
         }
         return true;
@@ -92,7 +89,6 @@ double myNode2D::getDistance(const myNode2D &n) const
     return sqrt(dx * dx + dy * dy);
 }
 
-// Comparison
 bool myNode2D::operator==(myNode2D &n)
 {
     if (!isCoordsEqual(n)) // corrdinate based comparison (this is necessary)
@@ -105,25 +101,21 @@ bool myNode2D::operator==(myNode2D &n)
     }
 
     if (!hasNeighborhoodIntersection(n))
-    {
         return (false);
-    }
 
     genNo = std::min(genNo, n.genNo);
     return (true);
 }
 
-// Constructors
 myNode2D::myNode2D(COORD_TYPE xx, COORD_TYPE yy) : x(xx), y(yy) {}
 
-// Inherited functions being overwritten
 int myNode2D::getHashBin(void) const
 {
-    return (100 * abs(x) + abs(y)); // SB: better hash function
+    return (100 * abs(x) + abs(y));
 }
 
 void myNode2D::print(std::string head, std::string tail) const
-{ // Print this node
+{
     _dosl_cout << std::setw(2) << std::right << head
                << std::setw(4) << std::right << "[x=" << x
                << ", y=" << y << "]"

@@ -1,23 +1,24 @@
-{
-    'map_indoor':
-    {  environment: { pixmap: "map_indoor.png"},
-        start:     [50, 30],
-        goal:      [80, 120],
-        plot_options: { plot_scale: 7.0,
+
+{                                                                   // Container for 2D environments
+    'map_indoor':                                                   // map name
+    {  environment: { pixmap: "map_indoor.png"},                    // png file representing the map
+        start:     [50, 30],                                        // start pixel
+        goal:      [80, 120],                                       // goal pixel
+        plot_options: { plot_scale: 7.0,                            // plot options
                         line_thickness: 3.0},
-        n_paths: 3                              
+        n_paths: 3                                                  // number of desired paths
     },
 
-    'map_nonuniform':                                        
-    {  environment: { pixmap: "map_nonuniform_obstacles.png",
-                      cost_type: "nonuniform",
-                      cost_multiplier: 4.0},    
-        start:     [20 , 20],                       
-        goal:      [140, 180],   
-        plot_options: { plot_scale: 5.0,
+    'map_nonuniform':                                               // map name
+    {  environment: { pixmap: "map_nonuniform_obstacles.png",       // png file representing the obstacles
+                      cost_type: "nonuniform",                      // cost type
+                      cost_multiplier: 4.0},                        // cost multiplier
+        start:     [20 , 20],                                       // start pixel
+        goal:      [140, 180],                                      // goal pixel
+        plot_options: { plot_scale: 5.0,                            // plot options
                         line_thickness: 3.0,
-                        plot_map: "map_nonuniform_costs.png"},
-        n_paths: 3                             
+                        plot_map: "map_nonuniform_costs.png"},      // png file representing the high cost regions (this will be displayed)
+        n_paths: 3                                                  // number of desired paths
     },
 
     'map_nonuniform_with_obstacles':                                        

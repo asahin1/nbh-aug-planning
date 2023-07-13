@@ -329,7 +329,8 @@ void AStar::Algorithm<AlgDerived, NodeType, CostType>::generate_successors(NodeT
 
             auto tmp_npc = _DOSL_SMALL_MAP_pairfun(all_nodes_set_p->get(this_successors[a]), this_transition_costs[a]); // *SB
 
-            // if (!(tmp_npc.first->isMergePoint))                                                                         // *SB: don't make new connections to known merge points
+            if (tmp_npc.first->isCutPoint)
+                break;
             node_in_hash_p->successors.insert(tmp_npc);
         }
         node_in_hash_p->successors_created = true;
@@ -403,8 +404,11 @@ void AStar::Algorithm<AlgDerived, NodeType, CostType>::search(void)
         // get the node with least f_score-value
         thisNodeInHash_p = node_heap_p->pop();
 
-        // if (thisNodeInHash_p->isMergePoint)
-        //     continue; // *SB
+        if (thisNodeInHash_p->isCutPoint)
+        {
+            _this->nodeEvent(*thisNodeInHash_p, EXPANDED | POPPED);
+            continue;
+        }
 
 #if _DOSL_EVENTHANDLER
         _this->nodeEvent(*thisNodeInHash_p, EXPANDED | POPPED);
