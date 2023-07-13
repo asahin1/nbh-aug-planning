@@ -115,11 +115,15 @@ We use the default algorithm SStar, when prompted.
 ./bin/3D_NAG_Search_SStar env_long_rectangle 3d_original
 ```
 
+![](/media/env_long_rectangle.png)
+
 #### Building-like environment
 
 ```
 ./bin/3D_NAG_Search_SStar env_building2 3d_original
 ```
+
+![](/media/env_building2.png)
 
 #### Trefoil knot
 
@@ -127,11 +131,15 @@ We use the default algorithm SStar, when prompted.
 ./bin/3D_NAG_Search_SStar env_trefoil_knot 3d_original
 ```
 
+![](/media/env_trefoil_knot.png)
+
 #### Extremely low curvature environment (around a 3D corner)
 
 ```
 ./bin/3D_NAG_Search_SStar env_cube 3d_with_cut
 ```
+
+![](/media/env_cube.png)
 
 ## Citation
 
