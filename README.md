@@ -58,7 +58,7 @@ For 3D: See SGL dependencies
 
 2. Refer to [expt/algorithm_parameters.json](https://github.com/asahin1/nbh-aug-planning/blob/main/expt/algorithm_parameters.json) for different parameter sets. You may choose one of the available parameter sets, make any changes to existing parameter sets, or add your own.
 
-3. Run the compiled method on a chosen environment with a parameter set:
+3. Run the compiled program on a chosen environment with a parameter set:
    ```
    ./bin/<program-name>_<algorithm-name> <env-name> <parameter-set-name>
    ```
