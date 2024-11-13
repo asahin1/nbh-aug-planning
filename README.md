@@ -1,6 +1,6 @@
 # Neighborhood Augmented Planning
 
-### Last Updated: 07/13/2023
+### Last Updated: 11/13/2024
 
 ---
 
@@ -8,9 +8,9 @@
 
 This repository contains the implementation of the Neighborhood-Augmented Planning algorithm for 2D and 3D environments.
 
-For more details regarding the algorithm:
+For more details regarding the algorithm, please refer to our paper:
 
-- [Topo-Geometrically Distinct Path Computation using Neighborhood-augmented Graph, and its Application to Path Planning for a Tethered Robot in 3D](https://arxiv.org/abs/2306.01203) (under review)
+- Topo-Geometrically Distinct Path Computation using Neighborhood-augmented Graph, and its Application to Path Planning for a Tethered Robot in 3D ([T-RO](https://doi.org/10.1109/TRO.2024.3492386), [arXiv](https://arxiv.org/abs/2306.01203))
 
 ## Included Modules
 
@@ -145,17 +145,18 @@ We use the default algorithm SStar, when prompted.
 
 If you found the Neighborhood Augmented Planning algorithm useful in your research, please cite it in your paper as follows:
 
-_Alp Sahin and Subhrajit Bhattacharya, "Topo-Geometrically Distinct Path Computation using Neighborhood-augmented Graph, and its Application to Path Planning for a Tethered Robot in 3D", 2023, arXiv:2306.01203 [cs.RO]._
+_A. Sahin and S. Bhattacharya, "Topo-Geometrically Distinct Path Computation Using Neighborhood-Augmented Graph, and Its Application to Path Planning for a Tethered Robot in 3D," in IEEE Transactions on Robotics, doi: 10.1109/TRO.2024.3492386._
 
 Bibtex entry:
 
 ```
- @misc{sahin2023topogeometrically,
-      title={Topo-Geometrically Distinct Path Computation using Neighborhood-augmented Graph, and its Application to Path Planning for a Tethered Robot in 3D},
-      author={Alp Sahin and Subhrajit Bhattacharya},
-      year={2023},
-      eprint={2306.01203},
-      archivePrefix={arXiv},
-      primaryClass={cs.RO}
-}
+@ARTICLE{Sahin2024Topo,
+  author={Sahin, Alp and Bhattacharya, Subhrajit},
+  journal={IEEE Transactions on Robotics}, 
+  title={Topo-Geometrically Distinct Path Computation Using Neighborhood-Augmented Graph, and Its Application to Path Planning for a Tethered Robot in 3D}, 
+  year={2024},
+  volume={},
+  number={},
+  pages={1-20},
+  doi={10.1109/TRO.2024.3492386}}
 ```
